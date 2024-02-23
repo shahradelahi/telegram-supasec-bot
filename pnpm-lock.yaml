@@ -36,8 +36,8 @@ dependencies:
     specifier: ^3.22.4
     version: 3.22.4
   zod-request:
-    specifier: 0.1.1-canary.1
-    version: 0.1.1-canary.1
+    specifier: 0.1.1
+    version: 0.1.1
 
 devDependencies:
   '@types/node':
@@ -1588,8 +1588,8 @@ packages:
     engines: {node: '>= 14'}
     dev: true
 
-  /zod-request@0.1.1-canary.1:
-    resolution: {integrity: sha512-yb/Pi9yLWB9btvqLa7eP0fWLX8Hmho04zAvTBhY8mqwSlh13SCFZrjMR7wcX5HArK0e4PAtb/0cVU2zTlCiQ7g==}
+  /zod-request@0.1.1:
+    resolution: {integrity: sha512-7ibmwVdYnREEW6TyQ0itFzdLJY5peFndKh04c58HgEUKJgPD4x9DUg5wUoBxPrTRnygmKdw+t3IOl0+VevptxQ==}
     dependencies:
       undici-types: 6.6.2
       zod: 3.22.4
