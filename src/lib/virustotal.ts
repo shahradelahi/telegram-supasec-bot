@@ -1,4 +1,5 @@
 import { env } from '@/env';
+import { logger } from '@/logger';
 import { z } from 'zod';
 import { fetch } from 'zod-request';
 
@@ -8,6 +9,70 @@ const ErrorSchema = z.object({
     message: z.string()
   })
 });
+
+const FileReportSchema = z.object({
+  data: z.object({
+    id: z.string(),
+    type: z.string(),
+    links: z.object({ self: z.string() }),
+    attributes: z.object({
+      ssdeep: z.string(),
+      tlsh: z.string(),
+      sha1: z.string(),
+      last_analysis_stats: z.object({
+        malicious: z.number(),
+        suspicious: z.number(),
+        undetected: z.number(),
+        harmless: z.number(),
+        timeout: z.number(),
+        'confirmed-timeout': z.number(),
+        failure: z.number(),
+        'type-unsupported': z.number()
+      }),
+      unique_sources: z.number(),
+      size: z.number(),
+      last_analysis_date: z.number(),
+      type_description: z.string(),
+      trid: z.array(z.object({ file_type: z.string(), probability: z.number() })).optional(),
+      type_tags: z.array(z.string()),
+      md5: z.string(),
+      last_analysis_results: z.record(
+        z.object({
+          method: z.string(),
+          engine_name: z.string(),
+          engine_version: z.string().nullable(),
+          engine_update: z.string().nullable(),
+          category: z.enum([
+            'harmless',
+            'malicious',
+            'suspicious',
+            'undetected',
+            'timeout',
+            'confirmed-timeout',
+            'failure',
+            'type-unsupported'
+          ]),
+          result: z.null()
+        })
+      ),
+      tags: z.array(z.string()),
+      total_votes: z.object({ harmless: z.number(), malicious: z.number() }),
+      times_submitted: z.number(),
+      meaningful_name: z.string().optional(),
+      sha256: z.string(),
+      names: z.array(z.string()),
+      type_tag: z.string(),
+      type_extension: z.string(),
+      first_submission_date: z.number(),
+      last_modification_date: z.number(),
+      last_submission_date: z.number(),
+      reputation: z.number(),
+      magic: z.string()
+    })
+  })
+});
+
+export type FileReport = z.infer<typeof FileReportSchema>;
 
 export async function getFileReport(hash: string) {
   const response = await fetch(`https://www.virustotal.com/api/v3/files/${hash}`, {
@@ -24,69 +89,7 @@ export async function getFileReport(hash: string) {
         // error
         ErrorSchema,
         // success
-        z.object({
-          data: z.object({
-            id: z.string(),
-            type: z.string(),
-            links: z.object({ self: z.string() }),
-            attributes: z.object({
-              ssdeep: z.string(),
-              tlsh: z.string(),
-              sha1: z.string(),
-              last_analysis_stats: z.object({
-                malicious: z.number(),
-                suspicious: z.number(),
-                undetected: z.number(),
-                harmless: z.number(),
-                timeout: z.number(),
-                'confirmed-timeout': z.number(),
-                failure: z.number(),
-                'type-unsupported': z.number()
-              }),
-              unique_sources: z.number(),
-              size: z.number(),
-              last_analysis_date: z.number(),
-              type_description: z.string(),
-              trid: z
-                .array(z.object({ file_type: z.string(), probability: z.number() }))
-                .optional(),
-              type_tags: z.array(z.string()),
-              md5: z.string(),
-              last_analysis_results: z.record(
-                z.object({
-                  method: z.string(),
-                  engine_name: z.string(),
-                  engine_version: z.string().nullable(),
-                  engine_update: z.string().nullable(),
-                  category: z.enum([
-                    'harmless',
-                    'malicious',
-                    'suspicious',
-                    'undetected',
-                    'timeout',
-                    'confirmed-timeout',
-                    'failure',
-                    'type-unsupported'
-                  ]),
-                  result: z.null()
-                })
-              ),
-              tags: z.array(z.string()),
-              total_votes: z.object({ harmless: z.number(), malicious: z.number() }),
-              times_submitted: z.number(),
-              meaningful_name: z.string(),
-              sha256: z.string(),
-              names: z.array(z.string()),
-              type_tag: z.string(),
-              type_extension: z.string(),
-              first_submission_date: z.number(),
-              last_modification_date: z.number(),
-              last_submission_date: z.number(),
-              reputation: z.number(),
-              magic: z.string()
-            })
-          })
-        })
+        FileReportSchema
       ])
     }
   });
@@ -111,13 +114,29 @@ export async function getFileReport(hash: string) {
  * @param content
  * @param password
  */
-export async function uploadFile(filename: string, content: string, password?: string) {
+export async function uploadFile(
+  filename: string,
+  content: string | ArrayBuffer,
+  password?: string
+) {
   const body = new FormData();
   const blob = new Blob([content]);
   body.set('file', blob, filename);
   if (password) body.set('password', password);
 
-  const response = await fetch('https://www.virustotal.com/api/v3/files', {
+  let url = 'https://www.virustotal.com/api/v3/files';
+
+  // if the file is larger than 32MB, get a special URL to upload the file
+  if (blob.size > 32 * 1024 * 1024) {
+    const res = await getUploadURL();
+    if (!('data' in res)) {
+      logger.error(res);
+      throw new Error('Failed to get the special URL to upload the file');
+    }
+    url = res.data;
+  }
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'X-Apikey': env.VT_API_KEY,
@@ -173,6 +192,80 @@ export async function getUploadURL() {
         z.object({
           data: z.string().url()
         })
+      ])
+    }
+  });
+
+  const data = await response.json();
+  return data;
+}
+
+const AnalysisSchema = z.object({
+  data: z.object({
+    id: z.string(),
+    type: z.string(),
+    links: z.object({ self: z.string(), item: z.string() }),
+    attributes: z.object({
+      stats: z.object({
+        malicious: z.number(),
+        suspicious: z.number(),
+        undetected: z.number(),
+        harmless: z.number(),
+        timeout: z.number(),
+        'confirmed-timeout': z.number(),
+        failure: z.number(),
+        'type-unsupported': z.number()
+      }),
+      results: z.record(
+        z.object({
+          method: z.string(),
+          engine_name: z.string(),
+          engine_version: z.string().nullable(),
+          engine_update: z.string().nullable(),
+          category: z.enum([
+            'harmless',
+            'malicious',
+            'suspicious',
+            'undetected',
+            'timeout',
+            'confirmed-timeout',
+            'failure',
+            'type-unsupported'
+          ]),
+          result: z.string().nullable()
+        })
+      ),
+      date: z.number(),
+      status: z.enum(['queued', 'completed', 'in-progress', 'failed'])
+    })
+  })
+});
+
+export type Analysis = z.infer<typeof AnalysisSchema>;
+
+/**
+ * Get a URL / file analysis
+ *
+ * ```sh
+ *    curl --request GET \
+ *   --url https://www.virustotal.com/api/v3/analyses/{id} \
+ *   --header 'x-apikey: <your API key>'
+ *  ```
+ */
+export async function getAnalysisURL(id: string) {
+  const response = await fetch(`https://www.virustotal.com/api/v3/analyses/${id}`, {
+    headers: {
+      'X-Apikey': env.VT_API_KEY
+    },
+    schema: {
+      headers: z.object({
+        'X-Apikey': z.string()
+      }),
+      response: z.union([
+        // error
+        ErrorSchema,
+        // success
+        AnalysisSchema
       ])
     }
   });

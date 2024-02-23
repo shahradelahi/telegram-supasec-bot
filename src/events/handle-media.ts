@@ -1,5 +1,9 @@
+import { bot } from '@/bot';
+import { env } from '@/env';
 import { scanRemoteFile } from '@/helpers/scan-remote-file';
+import { logger } from '@/logger';
 import { parseInline } from '@/utils/markdown';
+import path from 'node:path';
 import type { Context } from 'telegraf';
 import type { Message, Update } from 'telegraf/types';
 
@@ -14,12 +18,15 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.D
     reply_to_message_id: ctx.message.message_id
   });
 
-  if (document.file_size && document.file_size > 300 * 1024 * 1024) {
+  if (document.file_size && document.file_size > 500 * 1024 * 1024) {
     await ctx.telegram.editMessageText(
       ctx.chat.id,
       message.message_id,
       undefined,
-      `The file size is too large. The maximum file size is 300 MB.`
+      await parseInline(`File is too large. The maximum file size is **500 MB**.`),
+      {
+        parse_mode: 'HTML'
+      }
     );
     return;
   }
@@ -29,13 +36,16 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.D
     ctx.chat.id,
     message.message_id,
     undefined,
-    `Downloading the file...`
+    await parseInline(`\
+🚀 File initialized.
+
+      ⏳ _Downloading the file..._`),
+    {
+      parse_mode: 'HTML'
+    }
   );
 
-  console.log(document.file_id);
-  const fileLink = await ctx.telegram.getFileLink(document.file_id);
-  console.log(fileLink.toString());
-
+  const fileLink = await getFileLink(document.file_id);
   if (!fileLink) {
     await ctx.telegram.editMessageText(
       ctx.chat.id,
@@ -53,6 +63,24 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.D
   });
 }
 
+async function getFileLink(fileId: string): Promise<URL | undefined> {
+  const fileLink = await bot.telegram.getFile(fileId);
+  if (!fileLink.file_path) {
+    logger.debug(`Could not get the file path for the file.`);
+    return;
+  }
+
+  // If the path was absolute, remove the first 5 segments of the pathname, because of
+  // were using the local bot api server, and the file path is relative to the bot api server.
+  if (path.isAbsolute(fileLink.file_path)) {
+    const segments = fileLink.file_path.split('/');
+    segments.splice(0, 5);
+    return new URL(segments.join('/'), `${env.TG_API_BASE_URL}/file/bot${env.TG_TOKEN}/`);
+  }
+
+  return new URL(fileLink.file_path, `${env.TG_API_BASE_URL}/file/bot${env.TG_TOKEN}/`);
+}
+
 export async function handleSticker(ctx: Context<Update.MessageUpdate<Message.StickerMessage>>) {
   const { sticker } = ctx.message;
 
@@ -65,13 +93,17 @@ export async function handleSticker(ctx: Context<Update.MessageUpdate<Message.St
     reply_to_message_id: ctx.message.message_id
   });
 
-  // check if the file size is too large
-  if (sticker.file_size && sticker.file_size > 300 * 1024 * 1024) {
+  // check if the file size is too large. MAx 500 MB
+  if (sticker.file_size && sticker.file_size > 500 * 1024 * 1024) {
     await ctx.telegram.editMessageText(
       ctx.chat.id,
       message.message_id,
       undefined,
-      `The sticker size is too large. The maximum file size is 300 MB.`
+      await parseInline(`\
+The sticker is too large. The maximum file size is **500 MB**.`),
+      {
+        parse_mode: 'HTML'
+      }
     );
     return;
   }
@@ -83,7 +115,7 @@ export async function handleSticker(ctx: Context<Update.MessageUpdate<Message.St
     `Downloading the sticker...`
   );
 
-  const fileLink = await ctx.telegram.getFileLink(sticker.file_id);
+  const fileLink = await getFileLink(sticker.file_id);
   if (!fileLink) {
     await ctx.telegram.editMessageText(
       ctx.chat.id,

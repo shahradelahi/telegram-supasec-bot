@@ -13,4 +13,3 @@ process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
 console.log();
 logger.info('Bot is running');
-// console.log('Bot is running');
