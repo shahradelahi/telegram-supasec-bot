@@ -21,11 +21,15 @@
     "telegraf": "^4.15.3",
     "validator": "^13.11.0",
     "zod": "^3.22.4",
-    "zod-request": "0.1.1-canary.1"
+    "zod-request": "0.1.1"
   },
   "devDependencies": {
+    "@types/chai": "^4.3.11",
+    "@types/mocha": "^10.0.6",
     "@types/node": "^20.11.19",
     "@types/validator": "^13.11.9",
+    "chai": "^5.1.0",
+    "mocha": "^10.3.0",
     "pino": "^8.19.0",
     "pino-pretty": "^10.3.1",
     "tsup": "^8.0.2",

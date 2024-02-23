@@ -2,6 +2,13 @@ import { env } from '@/env';
 import { z } from 'zod';
 import { fetch } from 'zod-request';
 
+const ErrorSchema = z.object({
+  error: z.object({
+    code: z.string(),
+    message: z.string()
+  })
+});
+
 export async function getFileReport(hash: string) {
   const response = await fetch(`https://www.virustotal.com/api/v3/files/${hash}`, {
     headers: {
@@ -15,12 +22,7 @@ export async function getFileReport(hash: string) {
       }),
       response: z.union([
         // error
-        z.object({
-          error: z.object({
-            code: z.string(),
-            message: z.string()
-          })
-        }),
+        ErrorSchema,
         // success
         z.object({
           data: z.object({
@@ -84,6 +86,92 @@ export async function getFileReport(hash: string) {
               magic: z.string()
             })
           })
+        })
+      ])
+    }
+  });
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Upload a file to VirusTotal. The file must be less than 32MB
+ *
+ *  Curl example:
+ *
+ *  ```sh
+ *    curl --request POST \
+ *      --url https://www.virustotal.com/api/v3/files \
+ *      --header 'accept: application/json' \
+ *      --header 'content-type: multipart/form-data'
+ *  ```
+ *
+ * @param filename
+ * @param content
+ * @param password
+ */
+export async function uploadFile(filename: string, content: string, password?: string) {
+  const body = new FormData();
+  const blob = new Blob([content]);
+  body.set('file', blob, filename);
+  if (password) body.set('password', password);
+
+  const response = await fetch('https://www.virustotal.com/api/v3/files', {
+    method: 'POST',
+    headers: {
+      'X-Apikey': env.VT_API_KEY,
+      Accept: 'application/json'
+    },
+    body,
+    schema: {
+      headers: z.object({
+        'X-Apikey': z.string(),
+        Accept: z.string()
+      }),
+      response: z.union([
+        // error
+        ErrorSchema,
+        // success
+        z.object({
+          data: z.object({
+            type: z.string(),
+            id: z.string(),
+            links: z.object({ self: z.string() })
+          })
+        })
+      ])
+    }
+  });
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Get a special URL to upload a large file to VirusTotal
+ *
+ * ```sh
+ *    curl --request GET \
+ *   --url https://www.virustotal.com/api/v3/files/upload_url \
+ *   --header 'x-apikey: <your API key>'
+ *  ```
+ */
+export async function getUploadURL() {
+  const response = await fetch('https://www.virustotal.com/api/v3/files/upload_url', {
+    headers: {
+      'X-Apikey': env.VT_API_KEY
+    },
+    schema: {
+      headers: z.object({
+        'X-Apikey': z.string()
+      }),
+      response: z.union([
+        // error
+        ErrorSchema,
+        // success
+        z.object({
+          data: z.string().url()
         })
       ])
     }
