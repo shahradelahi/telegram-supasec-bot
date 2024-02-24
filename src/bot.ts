@@ -1,6 +1,7 @@
 import { env } from '@/env';
 import { handleDeleteMessage } from '@/events/handle-callbacks';
 import { handleDocument, handleSticker } from '@/events/handle-media';
+import { prisma } from '@/lib/prisma';
 import { logger } from '@/logger';
 import { parseInline } from '@/utils/markdown';
 import { HttpsProxyAgent } from 'https-proxy-agent';
@@ -16,6 +17,46 @@ const bot: Telegraf<Context> = new Telegraf(env.TG_TOKEN, {
   }
 });
 
+// Add the user to the database if they are not already there
+bot.use(async (ctx, next) => {
+  console.log(ctx);
+
+  // user must be present in the context and chat must be private
+  if (!ctx.from || !ctx.chat || ctx.chat.type !== 'private') {
+    logger.debug(`No user found in the context.`);
+    return next();
+  }
+
+  const { id, first_name, last_name, username } = ctx.from;
+
+  const user = await prisma.user.upsert({
+    where: { id },
+    update: { first_name, last_name, username, seen_at: new Date(), is_active: true },
+    create: { id, first_name, last_name, username }
+  });
+
+  ctx.state.user = user;
+
+  return next();
+});
+
+// On user left the chat update is_active to false
+bot.on('my_chat_member', async (ctx) => {
+  const { my_chat_member } = ctx.update;
+
+  if (
+    ctx.chat.type === 'private' &&
+    my_chat_member.old_chat_member.status === 'member' &&
+    my_chat_member.new_chat_member.status === 'kicked'
+  ) {
+    logger.debug(`User left the chat: ${ctx.from.id}`);
+    await prisma.user.update({
+      where: { id: ctx.from.id },
+      data: { is_active: false }
+    });
+  }
+});
+
 bot.command('start', async (ctx) => {
   const { first_name } = ctx.from;
   await ctx.replyWithHTML(
@@ -25,7 +66,7 @@ bot.command('start', async (ctx) => {
 
 I am a bot based on [VT-API](https://developers.virustotal.com/).
 
-• _You can send a file to the bot or forward it from another channel, and it will check the file on [VirusTotal](https://virustotal.com/) with over **70** different antiviruses._
+• _You can send a file to the bot or forward it from another channel, and it will check the file on [VirusTotal](https://virustotal.com/) with over **70** different scanners._
 
 • _To receive scan results, send me any file up to **500 MB** in size, and you will get a detailed analysis of it._
 
@@ -86,11 +127,6 @@ bot.on(callbackQuery('data'), async (ctx) => {
 
   logger.debug(`Unhandled callback query: ${ctx.callbackQuery.data}`);
   await ctx.answerCbQuery();
-});
-
-bot.use(async (ctx, next) => {
-  if (env.NODE_ENV === 'development') console.log(ctx.update);
-  next();
 });
 
 export { bot };

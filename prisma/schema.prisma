@@ -1,0 +1,69 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int     @id
+  first_name String
+  last_name  String?
+  username   String? @unique
+
+  is_active  Boolean  @default(true)
+  seen_at    DateTime @updatedAt
+  created_at DateTime @default(now())
+
+  total_requests Int       @default(0)
+  Request        Request[]
+}
+
+model File {
+  id String @id @default(uuid())
+
+  file_name String?
+  mime_type String?
+  size      Int
+
+  sha256 String @unique
+  md5    String @unique
+  sha1   String @unique
+
+  created_at DateTime @default(now())
+
+  Request    Request[]
+  ScanResult ScanResult?
+}
+
+model Request {
+  id String @id @default(uuid())
+
+  user_id Int
+  user    User @relation(fields: [user_id], references: [id])
+
+  file_id String
+  file    File   @relation(fields: [file_id], references: [id])
+
+  created_at DateTime @default(now())
+}
+
+model ScanResult {
+  id String @id @default(uuid())
+
+  file_id String @unique
+  file    File   @relation(fields: [file_id], references: [id])
+
+  result Json
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
