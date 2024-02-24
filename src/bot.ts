@@ -19,8 +19,6 @@ const bot: Telegraf<Context> = new Telegraf(env.TG_TOKEN, {
 
 // Add the user to the database if they are not already there
 bot.use(async (ctx, next) => {
-  console.log(ctx);
-
   // user must be present in the context and chat must be private
   if (!ctx.from || !ctx.chat || ctx.chat.type !== 'private') {
     logger.debug(`No user found in the context.`);
