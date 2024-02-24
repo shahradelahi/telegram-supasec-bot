@@ -18,6 +18,8 @@
     "@t3-oss/env-core": "^0.7.3",
     "dotenv": "^16.4.5",
     "https-proxy-agent": "^7.0.4",
+    "lodash": "^4.17.21",
+    "luxon": "^3.4.4",
     "marked": "^12.0.0",
     "prettier": "^3.2.5",
     "pretty-bytes": "^6.1.1",
@@ -28,6 +30,8 @@
   },
   "devDependencies": {
     "@types/chai": "^4.3.11",
+    "@types/lodash": "^4.14.202",
+    "@types/luxon": "^3.4.2",
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.11.19",
     "@types/validator": "^13.11.9",
