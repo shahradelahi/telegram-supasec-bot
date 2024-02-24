@@ -15,7 +15,9 @@ build:
 .PHONY: db
 db:
 	docker run --name supasec-db -e POSTGRES_PASSWORD=$(DATABASE_PASSWORD) -d -p 5432:5432 $(DOCKER_DATABASE_IMAGE)
-	npx prisma migrate dev --name init --create-db
+	sleep 5
+	npx prisma db push
+	npx prisma generate
 
 .PHONY: db-stop
 db-stop:

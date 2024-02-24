@@ -28,15 +28,16 @@ model User {
 }
 
 model File {
-  id String @id @default(uuid())
+  id               String @id @default(uuid())
+  telegram_file_id String
 
-  file_name String?
-  mime_type String?
-  size      Int
+  size BigInt
 
   sha256 String @unique
   md5    String @unique
   sha1   String @unique
+
+  has_scan_result Boolean @default(false)
 
   created_at DateTime @default(now())
 
@@ -48,10 +49,10 @@ model Request {
   id String @id @default(uuid())
 
   user_id Int
-  user    User @relation(fields: [user_id], references: [id])
+  user    User @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   file_id String
-  file    File   @relation(fields: [file_id], references: [id])
+  file    File   @relation(fields: [file_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   created_at DateTime @default(now())
 }
@@ -60,7 +61,7 @@ model ScanResult {
   id String @id @default(uuid())
 
   file_id String @unique
-  file    File   @relation(fields: [file_id], references: [id])
+  file    File   @relation(fields: [file_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   result Json
 
