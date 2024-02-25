@@ -1,5 +1,5 @@
 import { env } from '@/env';
-import { handleDeleteMessage } from '@/events/handle-callbacks';
+import { Callbacks } from '@/events/handle-callbacks';
 import {
   getMediaSize,
   handleDocument,
@@ -143,13 +143,7 @@ bot.on(
 
 bot.on(callbackQuery('data'), async (ctx) => {
   const [action, ...args] = ctx.callbackQuery.data.split(':');
-  if (action === 'delete') {
-    await handleDeleteMessage(ctx);
-    return;
-  }
-
-  logger.debug(`Unhandled callback query: ${ctx.callbackQuery.data}`);
-  await ctx.answerCbQuery();
+  await Callbacks.send(ctx, action, ...args);
 });
 
 export { bot };
