@@ -1,44 +1,69 @@
+import { editResultMessage } from '@/helpers/edit-result-message';
 import { getTelegramFileUrl } from '@/helpers/get-telegram-file-url';
 import { scanRemoteFile } from '@/helpers/scan-remote-file';
 import { Scanner } from '@/lib/scanner';
-import { FileReport } from '@/lib/virustotal';
 import { parseInline } from '@/utils/markdown';
 import { sum } from '@/utils/number';
-import { DateTime } from 'luxon';
-import prettyBytes from 'pretty-bytes';
 import type { Context } from 'telegraf';
 import type { Message, Update } from 'telegraf/types';
 
-export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.DocumentMessage>>) {
+export async function sendNotSupported(ctx: Context<Update.MessageUpdate>, messageId: number) {
+  await ctx.telegram.editMessageText(
+    ctx.chat.id,
+    messageId,
+    undefined,
+    `🙅‍♂ This bot does not support this file type.`
+  );
+}
+
+export function getMediaSize(ctx: Context<Update.MessageUpdate>) {
+  if ('document' in ctx.message) {
+    return ctx.message.document.file_size;
+  }
+
+  if ('sticker' in ctx.message) {
+    return ctx.message.sticker.file_size;
+  }
+
+  if ('photo' in ctx.message) {
+    return ctx.message.photo[0].file_size;
+  }
+
+  if ('video' in ctx.message) {
+    return ctx.message.video.file_size;
+  }
+
+  if ('voice' in ctx.message) {
+    return ctx.message.voice.file_size;
+  }
+
+  if ('audio' in ctx.message) {
+    return ctx.message.audio.file_size;
+  }
+
+  if ('animation' in ctx.message) {
+    return (ctx as Context<Update.MessageUpdate<Message.AnimationMessage>>).message.animation
+      .file_size;
+  }
+
+  if ('video_note' in ctx.message) {
+    return ctx.message.video_note.file_size;
+  }
+}
+
+export async function handleDocument(ctx: Context<Update.MessageUpdate>, messageId: number) {
+  if (!('document' in ctx.message)) {
+    return;
+  }
+
   const { document } = ctx.message;
-  if (!document) {
-    return;
-  }
-
-  const message = await ctx.replyWithHTML(await parseInline(`_Processing the file..._`), {
-    disable_web_page_preview: true,
-    reply_to_message_id: ctx.message.message_id
-  });
-
-  if (document.file_size && document.file_size > 500 * 1024 * 1024) {
-    await ctx.telegram.editMessageText(
-      ctx.chat.id,
-      message.message_id,
-      undefined,
-      await parseInline(`File is too large. The maximum file size is **500 MB**.`),
-      {
-        parse_mode: 'HTML'
-      }
-    );
-    return;
-  }
 
   const scanner = new Scanner(document.file_unique_id, document.file_id);
 
   scanner.on('database', async () => {
     await ctx.telegram.editMessageText(
       ctx.chat.id,
-      message.message_id,
+      messageId,
       undefined,
       await parseInline(`\
 🚀 File initialized.
@@ -54,7 +79,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.D
     if (state === 'STARTED') {
       await ctx.telegram.editMessageText(
         ctx.chat.id,
-        message.message_id,
+        messageId,
         undefined,
         await parseInline(`\
 🚀 File initialized.
@@ -69,7 +94,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.D
     if (state === 'DONE') {
       await ctx.telegram.editMessageText(
         ctx.chat.id,
-        message.message_id,
+        messageId,
         undefined,
         await parseInline(`\
 🚀 File initialized.
@@ -85,7 +110,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.D
     if (state === 'IN_PROGRESS') {
       await ctx.telegram.editMessageText(
         ctx.chat.id,
-        message.message_id,
+        messageId,
         undefined,
         await parseInline(`\
 🚀 File initialized.
@@ -102,7 +127,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.D
     if (status === 'STARTED') {
       await ctx.telegram.editMessageText(
         ctx.chat.id,
-        message.message_id,
+        messageId,
         undefined,
         await parseInline(`\
 🚀 File initialized.
@@ -118,7 +143,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.D
     if (status === 'DONE') {
       await ctx.telegram.editMessageText(
         ctx.chat.id,
-        message.message_id,
+        messageId,
         undefined,
         await parseInline(`\
 🚀 File initialized.
@@ -136,7 +161,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.D
     if (status === 'queued') {
       return await ctx.telegram.editMessageText(
         ctx.chat.id,
-        message.message_id,
+        messageId,
         undefined,
         await parseInline(`\
 🚀 File initialized.
@@ -157,7 +182,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.D
       const totalFinished = sum(...Object.values(stats));
       return await ctx.telegram.editMessageText(
         ctx.chat.id,
-        message.message_id,
+        messageId,
         undefined,
         await parseInline(`\
 🚀 File initialized.
@@ -175,108 +200,22 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate<Message.D
   });
 
   scanner.on('complete', async ({ result }) => {
-    await updateMessageWithResult(
-      ctx,
-      message.message_id,
-      {
-        filename: document.file_name,
-        mimetype: document.mime_type
-      },
-      result
-    );
+    await editResultMessage(ctx, messageId, document.file_name, result);
   });
 
   await scanner.scan();
 }
 
-async function updateMessageWithResult(
-  ctx: Context<Update.MessageUpdate<any>>,
-  messageID: number,
-  file: {
-    filename: string | undefined;
-    mimetype: string | undefined;
-  },
-  data: FileReport['data']
-) {
-  await ctx.telegram.editMessageText(
-    ctx.chat.id,
-    messageID,
-    undefined,
-    await parseInline(
-      `\
-🧬 **Detections**: **${data.attributes.last_analysis_stats.malicious}** / **${data.attributes.last_analysis_stats.malicious + data.attributes.last_analysis_stats.undetected}**
-${file.filename ? `\n📜 _**File name**_: _${file.filename}_` : ''}
-🔒 _**File type**_: _${data.attributes.type_description}_
-📁 _**File size**_: _${prettyBytes(data.attributes.size)}_
+export async function handleSticker(ctx: Context<Update.MessageUpdate>, messageId: number) {
+  if (!('sticker' in ctx.message)) {
+    return;
+  }
 
-🔬 _**First analysis**_
-• _${DateTime.fromSeconds(data.attributes.first_submission_date).setZone('UTC').toFormat('yyyy-MM-dd HH:mm:ss ZZZ')}_
-
-🔭 _**Last analysis**_
-• _${DateTime.fromSeconds(data.attributes.last_analysis_date).setZone('UTC').toFormat('yyyy-MM-dd HH:mm:ss ZZZ')}_
-
-🎉 _**Magic**_
-• _${data.attributes.magic}_
-
-[⚜️ Link to VirusTotal](https://www.virustotal.com/gui/file/${data.attributes.md5})`
-    ),
-    {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: `🧪 Detections`,
-              callback_data: `detections:${data.attributes.md5}`
-            },
-            {
-              text: `🔐 Signature`,
-              callback_data: `signature:${data.attributes.md5}`
-            }
-          ],
-          [
-            {
-              text: `❌ Close`,
-              callback_data: `delete:${messageID}`
-            }
-          ]
-        ]
-      },
-      disable_web_page_preview: true
-    }
-  );
-}
-
-export async function handleSticker(ctx: Context<Update.MessageUpdate<Message.StickerMessage>>) {
   const { sticker } = ctx.message;
 
-  if (!sticker) {
-    return;
-  }
-
-  const message = await ctx.replyWithHTML(await parseInline(`_Processing the sticker..._`), {
-    disable_web_page_preview: true,
-    reply_to_message_id: ctx.message.message_id
-  });
-
-  // check if the file size is too large. MAx 500 MB
-  if (sticker.file_size && sticker.file_size > 500 * 1024 * 1024) {
-    await ctx.telegram.editMessageText(
-      ctx.chat.id,
-      message.message_id,
-      undefined,
-      await parseInline(`\
-The sticker is too large. The maximum file size is **500 MB**.`),
-      {
-        parse_mode: 'HTML'
-      }
-    );
-    return;
-  }
-
   await ctx.telegram.editMessageText(
     ctx.chat.id,
-    message.message_id,
+    messageId,
     undefined,
     `Downloading the sticker...`
   );
@@ -285,14 +224,14 @@ The sticker is too large. The maximum file size is **500 MB**.`),
   if (!fileLink) {
     await ctx.telegram.editMessageText(
       ctx.chat.id,
-      message.message_id,
+      messageId,
       undefined,
       `Could not download the sticker.`
     );
     return;
   }
 
-  await scanRemoteFile(ctx, message.message_id, {
+  await scanRemoteFile(ctx, messageId, {
     url: fileLink.toString(),
     filename: sticker.file_id,
     mimetype: 'image/webp'

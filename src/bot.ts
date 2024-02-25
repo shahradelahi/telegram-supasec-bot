@@ -1,13 +1,17 @@
 import { env } from '@/env';
 import { handleDeleteMessage } from '@/events/handle-callbacks';
-import { handleDocument, handleSticker } from '@/events/handle-media';
+import {
+  getMediaSize,
+  handleDocument,
+  handleSticker,
+  sendNotSupported
+} from '@/events/handle-media';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/logger';
 import { parseInline } from '@/utils/markdown';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { Context, Telegraf } from 'telegraf';
 import { anyOf, callbackQuery, message } from 'telegraf/filters';
-import { Update } from 'telegraf/types';
 import validator from 'validator';
 
 const bot: Telegraf<Context> = new Telegraf(env.TG_TOKEN, {
@@ -98,21 +102,42 @@ bot.on(
     message('animation'),
     message('video_note')
   ),
-  async (ctx: Context<Update>) => {
-    if (ctx.has(message('document'))) {
-      await handleDocument(ctx);
+  async (ctx) => {
+    const { message_id } = await ctx.replyWithHTML(await parseInline(`_Processing the file..._`), {
+      disable_web_page_preview: true,
+      reply_to_message_id: ctx.message.message_id
+    });
+
+    const mediaSize = getMediaSize(ctx);
+
+    if (!mediaSize || mediaSize === -1) {
+      await sendNotSupported(ctx, message_id);
       return;
     }
 
-    if (ctx.has(message('sticker'))) {
-      await handleSticker(ctx);
+    if (mediaSize > 500 * 1024 * 1024) {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        message_id,
+        undefined,
+        await parseInline(`😨 File is too large. The maximum file size is **500 MB**.`),
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
+    if ('document' in ctx.message) {
+      await handleDocument(ctx, message_id);
+      return;
+    }
+
+    if ('sticker' in ctx.message) {
+      await handleSticker(ctx, message_id);
       return;
     }
 
     // Not supported yet
-    await ctx.reply(`🙅‍♂ This bot does not support this file type.`, {
-      reply_to_message_id: ctx.message?.message_id
-    });
+    await sendNotSupported(ctx, message_id);
   }
 );
 
