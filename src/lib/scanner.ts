@@ -1,7 +1,8 @@
 import { getTelegramFileUrl } from '@/helpers/get-telegram-file-url';
-import { DbFile, DbScanResult, prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { Analysis, FileReport, getAnalysisURL, getFileReport, uploadFile } from '@/lib/virustotal';
 import { logger } from '@/logger';
+import type { DbFile, DbScanResult } from '@/typings';
 import { wait } from '@/utils/wait';
 import { hash } from '@litehex/node-checksum';
 import lodash from 'lodash';

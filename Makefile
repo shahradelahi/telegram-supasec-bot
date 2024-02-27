@@ -1,25 +1,41 @@
+###################################################
+### Variables
+###################################################
+
 DOCKER_IMAGE=shahradel/supasec
 DOCKER_TAG=dev
 
-DOCKER_DATABASE_IMAGE=postgres:alpine
-
-DATABASE_NAME=supasec
-DATABASE_PASSWORD=super-secret-password
-
 DOCKER_BUILD=docker buildx build
+
+###################################################
+### Targets
+###################################################
 
 .PHONY: build
 build:
 	$(DOCKER_BUILD) -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 
+.PHONY: dev
+dev:
+	docker compose rm -fsv
+	docker compose -f docker-compose.dev.yml up
+
+.PHONY: start
+start:
+	docker compose rm -fsv
+	docker compose -f docker-compose.yml up -d
+
+.PHONY: stop
+stop:
+	docker compose rm -fsv
+
+########### Database ###########
+
 .PHONY: db
 db:
-	docker run --name supasec-db -e POSTGRES_PASSWORD=$(DATABASE_PASSWORD) -d -p 5432:5432 $(DOCKER_DATABASE_IMAGE)
+	docker rm -f supasec-db || true
+	docker run -d --name supasec-db -p 5432:5432 -e POSTGRES_PASSWORD=super-secret-password -e POSTGRES_DB=supasec postgres:alpine
 	sleep 5
 	npx prisma db push
-	npx prisma generate
 
-.PHONY: db-stop
-db-stop:
-	docker rm -f supasec-db
-
+###########

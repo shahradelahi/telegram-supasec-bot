@@ -1,0 +1,41 @@
+version: '3'
+services:
+  supasec-db:
+    container_name: 'supasec-db'
+    image: 'postgres:alpine'
+    restart: unless-stopped
+    volumes:
+      - supasec-db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=supasec
+      - POSTGRES_USER=supasec
+      - POSTGRES_PASSWORD=supasec
+
+  init-prisma:
+    container_name: 'prisma'
+    image: 'node:alpine'
+    depends_on:
+      - supasec-db
+    volumes:
+      - ./:/app
+    working_dir: /app
+    environment:
+      - DATABASE_URL=postgresql://supasec:supasec@supasec-db:5432/supasec?schema=private
+    command: npx prisma db push --accept-data-loss
+
+  supasec-bot:
+    container_name: 'supasec-bot'
+    depends_on:
+      - supasec-db
+      - init-prisma
+    image: 'node:alpine'
+    volumes:
+      - ./:/app
+    working_dir: /app
+    env_file: .env
+    command: sh -c "npm install && npm run dev"
+    environment:
+      - DATABASE_URL=postgresql://supasec:supasec@supasec-db:5432/supasec?schema=private
+
+volumes:
+  supasec-db:

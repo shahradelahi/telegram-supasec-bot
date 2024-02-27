@@ -52,7 +52,7 @@ const FileReportSchema = z.object({
             'failure',
             'type-unsupported'
           ]),
-          result: z.null()
+          result: z.string().nullable()
         })
       ),
       tags: z.array(z.string()),
@@ -75,14 +75,15 @@ const FileReportSchema = z.object({
 export type FileReport = z.infer<typeof FileReportSchema>;
 
 export async function getFileReport(hash: string) {
-  const response = await fetch(`https://www.virustotal.com/api/v3/files/${hash}`, {
+  const url = new URL(`/api/v3/files/${hash}`, env.VT_API_BASE_URL);
+  const response = await fetch(url, {
     headers: {
       'X-Apikey': env.VT_API_KEY,
-      'Content-Type': 'application/json'
+      Accept: 'application/json'
     },
     schema: {
       headers: z.object({
-        'Content-Type': z.string(),
+        Accept: z.string(),
         'X-Apikey': z.string()
       }),
       response: z.union([
@@ -93,6 +94,8 @@ export async function getFileReport(hash: string) {
       ])
     }
   });
+
+  logger.debug('GET %s %s', url, response.status);
 
   const data = await response.json();
   return data;
@@ -124,7 +127,7 @@ export async function uploadFile(
   body.set('file', blob, filename);
   if (password) body.set('password', password);
 
-  let url = 'https://www.virustotal.com/api/v3/files';
+  let url = new URL('/v3/files', env.VT_API_BASE_URL).toString();
 
   // if the file is larger than 32MB, get a special URL to upload the file
   if (blob.size > 32 * 1024 * 1024) {
@@ -133,7 +136,9 @@ export async function uploadFile(
       logger.error(res);
       throw new Error('Failed to get the special URL to upload the file');
     }
-    url = res.data;
+    url = res.data
+      // replace the base URL with the special URL
+      .replace('https://www.virustotal.com/api/', env.VT_API_BASE_URL);
   }
 
   const response = await fetch(url, {
@@ -177,13 +182,15 @@ export async function uploadFile(
  *  ```
  */
 export async function getUploadURL() {
-  const response = await fetch('https://www.virustotal.com/api/v3/files/upload_url', {
+  const response = await fetch(new URL('/v3/files/upload_url', env.VT_API_BASE_URL), {
     headers: {
-      'X-Apikey': env.VT_API_KEY
+      'X-Apikey': env.VT_API_KEY,
+      Accept: 'application/json'
     },
     schema: {
       headers: z.object({
-        'X-Apikey': z.string()
+        'X-Apikey': z.string(),
+        Accept: z.string()
       }),
       response: z.union([
         // error
@@ -253,13 +260,15 @@ export type Analysis = z.infer<typeof AnalysisSchema>;
  *  ```
  */
 export async function getAnalysisURL(id: string) {
-  const response = await fetch(`https://www.virustotal.com/api/v3/analyses/${id}`, {
+  const response = await fetch(new URL(`/v3/analyses/${id}`, env.VT_API_BASE_URL), {
     headers: {
-      'X-Apikey': env.VT_API_KEY
+      'X-Apikey': env.VT_API_KEY,
+      Accept: 'application/json'
     },
     schema: {
       headers: z.object({
-        'X-Apikey': z.string()
+        'X-Apikey': z.string(),
+        Accept: z.string()
       }),
       response: z.union([
         // error

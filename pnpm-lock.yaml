@@ -38,6 +38,9 @@ dependencies:
   telegraf:
     specifier: ^4.15.3
     version: 4.15.3
+  undici:
+    specifier: ^6.6.2
+    version: 6.6.2
   validator:
     specifier: ^13.11.0
     version: 13.11.0
@@ -300,6 +303,11 @@ packages:
     requiresBuild: true
     dev: true
     optional: true
+
+  /@fastify/busboy@2.1.0:
+    resolution: {integrity: sha512-+KpH+QxZU7O4675t3mnkQKcZZg56u+K/Ct2K+N2AZYNVK8kyeo/bI18tI8aPm3tvNNRyTWfj6s5tnGNlcbQRsA==}
+    engines: {node: '>=14'}
+    dev: false
 
   /@isaacs/cliui@8.0.2:
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
@@ -1909,6 +1917,13 @@ packages:
 
   /undici-types@6.6.2:
     resolution: {integrity: sha512-acoBcoBobgsg3YUEO/Oht8JJCuFYpzWLFKbqEbcEZcXdkQrTzkF/yWj9JoLaFDa6ArI31dFEmNZkCjQZ7mlf7w==}
+    dev: false
+
+  /undici@6.6.2:
+    resolution: {integrity: sha512-vSqvUE5skSxQJ5sztTZ/CdeJb1Wq0Hf44hlYMciqHghvz+K88U0l7D6u1VsndoFgskDcnU+nG3gYmMzJVzd9Qg==}
+    engines: {node: '>=18.0'}
+    dependencies:
+      '@fastify/busboy': 2.1.0
     dev: false
 
   /validator@13.11.0:

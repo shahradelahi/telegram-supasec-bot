@@ -61,6 +61,7 @@ bot.on('my_chat_member', async (ctx) => {
 
 bot.command('start', async (ctx) => {
   const { first_name } = ctx.from;
+  const botUsername = ctx.botInfo?.username;
   await ctx.replyWithHTML(
     await parseInline(
       `\
@@ -77,7 +78,18 @@ I am a bot based on [VT-API](https://developers.virustotal.com/).
 • _You can also add me to your chats, and I will be able to analyze the files sent by participants._`
     ),
     {
-      disable_web_page_preview: true
+      disable_web_page_preview: true,
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔗 Add to Group', url: `https://t.me/${botUsername}?startgroup=true` }],
+          [{ text: '👤 Profile', callback_data: 'profile' }],
+          [
+            { text: '📚 Help', callback_data: 'help' },
+            { text: '🇬🇧 Language', callback_data: 'language' }
+            // { text: '🔗 Source', url: 'https://github.com/shahradelahi/telegram-suapsec-bot' }
+          ]
+        ]
+      }
     }
   );
 });

@@ -2,10 +2,7 @@ import { bot } from '@/bot';
 import { logger } from '@/logger';
 import { sendError } from '@/utils/send-error';
 
-bot.launch().catch((error) => {
-  sendError(error);
-  process.exit(1);
-});
+bot.launch().catch(sendError);
 
 // Enable graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'));

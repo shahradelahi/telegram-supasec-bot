@@ -13,5 +13,5 @@ export default defineConfig({
   inject: ['cjs-shim.ts'],
   platform: 'node',
   target: 'esnext',
-  outDir: 'build'
+  outDir: 'dist'
 });

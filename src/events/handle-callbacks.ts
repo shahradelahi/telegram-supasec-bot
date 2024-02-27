@@ -59,6 +59,11 @@ Callbacks.on('detections', async (ctx, ...args) => {
   const malicious = Object.values(detections).filter((result) => result.category === 'malicious');
 
   const detectionsText = Object.values(detections)
+    .filter((result) =>
+      ['malicious', 'suspicious', 'harmless', 'undetected'].includes(result.category)
+    )
+    // Sort by alphabetical order
+    .sort((a, b) => a.engine_name.localeCompare(b.engine_name))
     .map((result) => {
       const category =
         result.category === 'malicious'
@@ -72,7 +77,7 @@ Callbacks.on('detections', async (ctx, ...args) => {
 
   await ctx.editMessageText(
     await parseInline(`\
-🧬 **Detections**: **${malicious.length}** / **${Object.values(detections).length}**
+🧬 **Detections**: **${malicious.length}** / **${report.result.attributes.last_analysis_stats.malicious + report.result.attributes.last_analysis_stats.undetected}**
 
 ${detectionsText}
 
@@ -130,18 +135,34 @@ Callbacks.on('signature', async (ctx, ...args) => {
   //
   // ⚜️ Link to VirusTotal (https://virustotal.com/gui/file/3b37ad1ba8b960e4780d69582cad54af355807f98fc2f5a6a831e096ab0d2185)
 
+  const message = Object.values(report.result.attributes.last_analysis_results)
+    .filter(({ result }) => typeof result === 'string' && result !== '')
+    .map(
+      ({ engine_name, result }) => `⛔️ **${engine_name}**
+  ╰ _\`${result}_\``
+    )
+    .join('\n');
+
   return ctx.editMessageText(
     await parseInline(`\
 🧬 **Detections**: **${report.result.attributes.last_analysis_stats.malicious}** / **${report.result.attributes.last_analysis_stats.malicious + report.result.attributes.last_analysis_stats.undetected}**
 
-${Object.values(report.result.attributes.last_analysis_results).map(
-  (result) => `⛔️ **${result.engine_name}**
-  ╰ _${result.result}_
-`
-)}
+${message}
 
 [⚜️ Link to VirusTotal](https://www.virustotal.com/gui/file/${report.result.attributes.md5})`),
-    { parse_mode: 'HTML' }
+    {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: '➥ Back',
+              callback_data: `result:${file.md5}`
+            }
+          ]
+        ]
+      }
+    }
   );
 });
 

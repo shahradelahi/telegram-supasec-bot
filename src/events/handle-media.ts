@@ -2,8 +2,10 @@ import { editResultMessage } from '@/helpers/edit-result-message';
 import { getTelegramFileUrl } from '@/helpers/get-telegram-file-url';
 import { scanRemoteFile } from '@/helpers/scan-remote-file';
 import { Scanner } from '@/lib/scanner';
+import { logger } from '@/logger';
 import { parseInline } from '@/utils/markdown';
 import { sum } from '@/utils/number';
+import { sendError } from '@/utils/send-error';
 import type { Context } from 'telegraf';
 import type { Message, Update } from 'telegraf/types';
 
@@ -115,7 +117,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate>, message
         await parseInline(`\
 🚀 File initialized.
 
-    ⏳ _Downloading the file: ${progress.toFixed(2)}%_`),
+    ⏳ _Downloading the file: ${(progress * 100).toFixed(2)}%_`),
         {
           parse_mode: 'HTML'
         }
@@ -203,7 +205,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate>, message
     await editResultMessage(ctx, messageId, document.file_name, result);
   });
 
-  await scanner.scan();
+  await scanner.scan().catch(sendError);
 }
 
 export async function handleSticker(ctx: Context<Update.MessageUpdate>, messageId: number) {
