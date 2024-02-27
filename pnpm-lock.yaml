@@ -37,7 +37,7 @@ dependencies:
     version: 6.1.1
   telegraf:
     specifier: ^4.15.3
-    version: 4.15.3
+    version: 4.16.2
   undici:
     specifier: ^6.6.2
     version: 6.6.2
@@ -544,8 +544,8 @@ packages:
       zod: 3.22.4
     dev: false
 
-  /@telegraf/types@6.9.1:
-    resolution: {integrity: sha512-bzqwhicZq401T0e09tu8b1KvGfJObPmzKU/iKCT5V466AsAZZWQrBYQ5edbmD1VZuHLEwopoOVY5wPP4HaLtug==}
+  /@telegraf/types@7.1.0:
+    resolution: {integrity: sha512-kGevOIbpMcIlCDeorKGpwZmdH7kHbqlk/Yj6dEpJMKEQw5lk0KVQY0OLXaCswy8GqlIVLd5625OB+rAntP9xVw==}
     dev: false
 
   /@types/chai@4.3.11:
@@ -1793,12 +1793,12 @@ packages:
     dependencies:
       has-flag: 4.0.0
 
-  /telegraf@4.15.3:
-    resolution: {integrity: sha512-pm2ZQAisd0YlUvnq6xdymDfoQR++8wTalw0nfw7Tjy0va+V/0HaBLzM8kMNid8pbbt7GHTU29lEyA5CAAr8AqA==}
+  /telegraf@4.16.2:
+    resolution: {integrity: sha512-d+/XMTBMW8DfQFhYkpyU2f58HMIPygkzClEE03c0LPoEKPGlY9da+9pOVSO7jq9Ar8RRT4OrfwW38sgF/o/x0w==}
     engines: {node: ^12.20.0 || >=14.13.1}
     hasBin: true
     dependencies:
-      '@telegraf/types': 6.9.1
+      '@telegraf/types': 7.1.0
       abort-controller: 3.0.0
       debug: 4.3.4(supports-color@8.1.1)
       mri: 1.2.0
