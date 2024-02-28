@@ -2,6 +2,10 @@ version: '3'
 services:
   supasec-bot:
     container_name: 'supasec-bot'
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
     image: 'node:alpine'
     volumes:
       - ./:/app

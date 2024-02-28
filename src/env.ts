@@ -9,6 +9,7 @@ export const env = createEnv({
     PROXY_URL: z.string().optional(),
     LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('trace'),
     LOG_COLORS: z.string().default('true'),
+    ADMIN_CHAT_ID: z.string().optional(),
     // Telegram
     TG_API_BASE_URL: z.string().default('https://api.telegram.org'),
     TG_TOKEN: z.string(),

@@ -21,10 +21,10 @@ services:
     working_dir: /app
     environment:
       - DATABASE_URL=postgresql://supasec:supasec@supasec-db:5432/supasec?schema=private
-    command: npx prisma db push --accept-data-loss
+    command: npx prisma db push --accept-data-loss --force-reset
 
-  supasec-bot:
-    container_name: 'supasec-bot'
+  dev-supasec-bot:
+    container_name: 'dev-supasec-bot'
     depends_on:
       - supasec-db
       - init-prisma
