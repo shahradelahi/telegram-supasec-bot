@@ -14,7 +14,7 @@ datasource db {
 }
 
 model User {
-  id         Int     @id
+  id         BigInt  @id
   first_name String
   last_name  String?
   username   String? @unique
@@ -48,8 +48,8 @@ model File {
 model Request {
   id String @id @default(uuid())
 
-  user_id Int
-  user    User @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user_id BigInt
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   file_id String
   file    File   @relation(fields: [file_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
