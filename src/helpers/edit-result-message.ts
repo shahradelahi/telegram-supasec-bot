@@ -24,10 +24,10 @@ ${hasName ? `\n📜 _**File name**_: _${filename || data.attributes.meaningful_n
 • _${DateTime.fromSeconds(data.attributes.first_submission_date).setZone('UTC').toFormat('yyyy-MM-dd HH:mm:ss')}_
 
 🔭 _**Last analysis**_
-• _${DateTime.fromSeconds(data.attributes.last_analysis_date).setZone('UTC').toFormat('yyyy-MM-dd HH:mm:ss')}_
+• _${data.attributes.last_analysis_date ? DateTime.fromSeconds(data.attributes.last_analysis_date).setZone('UTC').toFormat('yyyy-MM-dd HH:mm:ss') : 'N/A'}_
 
 🎉 _**Magic**_
-• _${data.attributes.magic}_
+• _${data.attributes.magic ?? 'N/A'}_
 
 [⚜️ Link to VirusTotal](https://www.virustotal.com/gui/file/${data.attributes.md5})`
   );

@@ -17,12 +17,10 @@ build:
 
 .PHONY: dev
 dev:
-	docker compose rm -fsv
 	docker compose -f docker-compose.dev.yml up
 
 .PHONY: start
 start:
-	docker compose rm -fsv
 	docker compose -f docker-compose.yml up -d
 
 .PHONY: stop

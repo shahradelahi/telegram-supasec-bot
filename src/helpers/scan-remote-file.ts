@@ -1,11 +1,11 @@
-import { FileReport, getAnalysisURL, getFileReport, uploadFile } from '@/lib/virustotal';
+import { editResultMessage } from '@/helpers/edit-result-message';
+import { getAnalysisURL, getFileReport, uploadFile } from '@/lib/virustotal';
 import { logger } from '@/logger';
 import { downloadFile } from '@/utils/download-file';
 import { parseInline } from '@/utils/markdown';
 import { sum } from '@/utils/number';
 import { wait } from '@/utils/wait';
 import { hash } from '@litehex/node-checksum';
-import prettyBytes from 'pretty-bytes';
 import type { Context } from 'telegraf';
 import type { Update } from 'telegraf/types';
 
@@ -90,7 +90,7 @@ export async function scanRemoteFile(
 
   const report = await getFileReport(sha256);
   if ('data' in report) {
-    await updateMessageWithResult(ctx, messageID, file, report);
+    await editResultMessage(ctx, messageID, file.filename, report.data);
     return;
   }
 
@@ -226,7 +226,7 @@ export async function scanRemoteFile(
       return;
     }
 
-    await updateMessageWithResult(ctx, messageID, file, fileReport);
+    await editResultMessage(ctx, messageID, file.filename, fileReport.data);
   }
 
   // Update message to say an error occurred
@@ -235,67 +235,5 @@ export async function scanRemoteFile(
     messageID,
     undefined,
     `An error occurred while processing the file.`
-  );
-}
-
-async function updateMessageWithResult(
-  ctx: Context<Update.MessageUpdate<any>>,
-  messageID: number,
-  file: RemoteFile,
-  { data }: FileReport
-) {
-  await ctx.telegram.editMessageText(
-    ctx.chat.id,
-    messageID,
-    undefined,
-    await parseInline(
-      `\
-🧬 **Detections**: **${data.attributes.last_analysis_stats.malicious}** / **${data.attributes.last_analysis_stats.malicious + data.attributes.last_analysis_stats.undetected}**
-
-🔖 _**File name**_: _${file.filename}_
-🔒 _**File type**_: _${data.attributes.type_description}_
-📁 _**File size**_: _${prettyBytes(data.attributes.size)}_
-
-🔬 _**First analysis**_
-• _${new Date(data.attributes.last_analysis_date * 1000).toLocaleString()}_
-
-🔭 _**Last analysis**_
-• _${new Date(data.attributes.last_analysis_date * 1000).toLocaleString()}_
-
-🎉 _**Magic**_
-• _${data.attributes.magic}_
-
-[⚜️ Link to VirusTotal](https://www.virustotal.com/gui/file/${data.attributes.md5})`
-    ),
-    {
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: `🧪 Detections`,
-              callback_data: `detections:${data.attributes.md5}`
-            },
-            {
-              text: `🔐 Signature`,
-              callback_data: `signature:${data.attributes.md5}`
-            }
-          ],
-          // [
-          //   {
-          //     text: `🔗 Open in VirusTotal`,
-          //     url: `https://www.virustotal.com/gui/file/${data.attributes.md5}`
-          //   }
-          // ],
-          [
-            {
-              text: `❌ Close`,
-              callback_data: `delete:${messageID}`
-            }
-          ]
-        ]
-      },
-      disable_web_page_preview: true
-    }
   );
 }

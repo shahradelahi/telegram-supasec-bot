@@ -1,11 +1,19 @@
 import { getTelegramFileUrl } from '@/helpers/get-telegram-file-url';
 import { prisma } from '@/lib/prisma';
-import { Analysis, FileReport, getAnalysisURL, getFileReport, uploadFile } from '@/lib/virustotal';
+import {
+  Analysis,
+  FileReport,
+  getAnalysisURL,
+  getFileReport,
+  rescanFile,
+  uploadFile
+} from '@/lib/virustotal';
 import { logger } from '@/logger';
 import type { DbFile, DbScanResult } from '@/typings';
 import { wait } from '@/utils/wait';
 import { hash } from '@litehex/node-checksum';
 import lodash from 'lodash';
+import { DateTime } from 'luxon';
 
 export class Scanner {
   private callbacks: Map<ScannerEvent, Callback<ScannerEvent>[]> = new Map();
@@ -36,11 +44,16 @@ export class Scanner {
         }
       });
 
-      if (scanResult) {
+      if (scanResult && scanResult.result) {
+        const result = scanResult.result as FileReport['data'];
+
         this.sendEvent(SCANNER_EVENT.COMPLETE, {
           ...scanResult,
-          result: scanResult.result as FileReport['data']
+          result
         });
+
+        await this.checkLastAnalysisDate(file.sha256, result.attributes.last_analysis_date);
+
         return;
       }
 
@@ -59,6 +72,10 @@ export class Scanner {
     const report = await this.getReport(downloadedFile.id, downloadedFile.sha256);
     if (report) {
       this.sendEvent(SCANNER_EVENT.COMPLETE, report);
+
+      const { last_analysis_date } = report.result.attributes;
+      await this.checkLastAnalysisDate(downloadedFile.sha256, last_analysis_date);
+
       return;
     }
 
@@ -69,6 +86,16 @@ export class Scanner {
       return;
     }
 
+    // Update the file in db that it has analysis id
+    await prisma.file.update({
+      where: {
+        id: downloadedFile.id
+      },
+      data: {
+        analysis_id: analysisId
+      }
+    });
+
     // Wait for the file to be analyzed
     logger.debug(`Waiting for the file to be analyzed.`);
     const result = await this.analyze(downloadedFile.id, downloadedFile.sha256, analysisId);
@@ -78,6 +105,60 @@ export class Scanner {
 
     logger.debug(`The file has been analyzed.`);
     this.sendEvent(SCANNER_EVENT.COMPLETE, result);
+  }
+
+  private async checkLastAnalysisDate(sha256: string, lastAnalysisDate: number | undefined) {
+    // This means, this is the first time the file is being scanned
+    if (!lastAnalysisDate) {
+      return;
+    }
+
+    // Log the last analysis date
+    logger.debug(
+      `Last analysis date: ${DateTime.fromSeconds(lastAnalysisDate).toISODate()}, diff: ${DateTime.fromSeconds(lastAnalysisDate).diffNow('days').days}`
+    );
+
+    // If report last analysis was older than 60 days, request a new analysis
+    if (DateTime.fromSeconds(lastAnalysisDate).diffNow('days').days < -60) {
+      const rescan = await rescanFile(sha256);
+      if ('error' in rescan) {
+        logger.error(`An error occurred while rescanning the file.`);
+        logger.error(rescan);
+        return;
+      }
+
+      logger.debug(`file ${sha256} submitted for rescanning.`);
+
+      // update analysis_id in the database
+      await prisma.file.update({
+        where: {
+          sha256: sha256
+        },
+        data: {
+          analysis_id: rescan.data.id,
+          has_scan_result: false
+        }
+      });
+
+      // Create a timeout for 1 minute for requesting for new analysis
+      setTimeout(async () => {
+        const file = await this.getFile();
+        if (!file) {
+          logger.debug(
+            `File not found in the database. Cannot request for new analysis. sha256: ${sha256}`
+          );
+          return;
+        }
+
+        const result = await this.getReport(file.id, sha256);
+        if (!result) {
+          return;
+        }
+
+        logger.debug(`The file has been rescanned.`);
+        this.sendEvent(SCANNER_EVENT.COMPLETE, result);
+      }, 60 * 1000);
+    }
   }
 
   private async getFile(): Promise<DbFile | null> {

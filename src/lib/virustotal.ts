@@ -16,8 +16,8 @@ const FileReportSchema = z.object({
     type: z.string(),
     links: z.object({ self: z.string() }),
     attributes: z.object({
-      ssdeep: z.string(),
-      tlsh: z.string(),
+      ssdeep: z.string().optional(),
+      tlsh: z.string().optional(),
       sha1: z.string(),
       last_analysis_stats: z.object({
         malicious: z.number(),
@@ -31,7 +31,7 @@ const FileReportSchema = z.object({
       }),
       unique_sources: z.number(),
       size: z.number(),
-      last_analysis_date: z.number(),
+      last_analysis_date: z.number().optional(),
       type_description: z.string(),
       trid: z.array(z.object({ file_type: z.string(), probability: z.number() })).optional(),
       type_tags: z.array(z.string()),
@@ -61,13 +61,13 @@ const FileReportSchema = z.object({
       meaningful_name: z.string().optional(),
       sha256: z.string(),
       names: z.array(z.string()),
-      type_tag: z.string(),
-      type_extension: z.string(),
+      type_tag: z.string().optional(),
+      type_extension: z.string().optional(),
       first_submission_date: z.number(),
       last_modification_date: z.number(),
       last_submission_date: z.number(),
       reputation: z.number(),
-      magic: z.string()
+      magic: z.string().optional()
     })
   })
 });
@@ -127,7 +127,7 @@ export async function uploadFile(
   body.set('file', blob, filename);
   if (password) body.set('password', password);
 
-  let url = new URL('/v3/files', env.VT_API_BASE_URL).toString();
+  let url = new URL('/api/v3/files', env.VT_API_BASE_URL).toString();
 
   // if the file is larger than 32MB, get a special URL to upload the file
   if (blob.size > 32 * 1024 * 1024) {
@@ -182,7 +182,7 @@ export async function uploadFile(
  *  ```
  */
 export async function getUploadURL() {
-  const response = await fetch(new URL('/v3/files/upload_url', env.VT_API_BASE_URL), {
+  const response = await fetch(new URL('/api/v3/files/upload_url', env.VT_API_BASE_URL), {
     headers: {
       'X-Apikey': env.VT_API_KEY,
       Accept: 'application/json'
@@ -260,7 +260,7 @@ export type Analysis = z.infer<typeof AnalysisSchema>;
  *  ```
  */
 export async function getAnalysisURL(id: string) {
-  const response = await fetch(new URL(`/v3/analyses/${id}`, env.VT_API_BASE_URL), {
+  const response = await fetch(new URL(`/api/v3/analyses/${id}`, env.VT_API_BASE_URL), {
     headers: {
       'X-Apikey': env.VT_API_KEY,
       Accept: 'application/json'
@@ -275,6 +275,37 @@ export async function getAnalysisURL(id: string) {
         ErrorSchema,
         // success
         AnalysisSchema
+      ])
+    }
+  });
+
+  const data = await response.json();
+  return data;
+}
+
+export async function rescanFile(id: string) {
+  const response = await fetch(new URL(`/api/v3/files/${id}/analyse`, env.VT_API_BASE_URL), {
+    method: 'POST',
+    headers: {
+      'X-Apikey': env.VT_API_KEY,
+      Accept: 'application/json'
+    },
+    schema: {
+      headers: z.object({
+        'X-Apikey': z.string(),
+        Accept: z.string()
+      }),
+      response: z.union([
+        // error
+        ErrorSchema,
+        // success
+        z.object({
+          data: z.object({
+            id: z.string(),
+            type: z.string(),
+            links: z.object({ self: z.string() })
+          })
+        })
       ])
     }
   });
