@@ -9,6 +9,7 @@ import {
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/logger';
 import { parseInline } from '@/utils/markdown';
+import { sendError } from '@/utils/send-error';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { Context, Telegraf } from 'telegraf';
 import { anyOf, callbackQuery, message } from 'telegraf/filters';
@@ -18,7 +19,8 @@ const bot: Telegraf<Context> = new Telegraf(env.TG_TOKEN, {
   telegram: {
     apiRoot: env.TG_API_BASE_URL,
     agent: env.TG_PROXY_URL ? new HttpsProxyAgent(env.TG_PROXY_URL) : undefined
-  }
+  },
+  handlerTimeout: 120_000 // 2 minutes
 });
 
 // Add the user to the database if they are not already there
@@ -71,7 +73,7 @@ I am a bot based on [VT-API](https://developers.virustotal.com/).
 
 • _You can send a file to the bot or forward it from another channel, and it will check the file on [VirusTotal](https://virustotal.com/) with over **70** different scanners._
 
-• _To receive scan results, send me any file up to **500 MB** in size, and you will get a detailed analysis of it._
+• _To receive scan results, send me any file up to **300 MB** in size, and you will get a detailed analysis of it._
 
 • _With the help of this bot, you can analyze suspicious files to identify viruses and other malicious programs._
 
@@ -127,29 +129,32 @@ bot.on(
       return;
     }
 
-    if (mediaSize > 500 * 1024 * 1024) {
+    if (mediaSize > 300 * 1024 * 1024) {
       await ctx.telegram.editMessageText(
         ctx.chat.id,
         message_id,
         undefined,
-        await parseInline(`😨 File is too large. The maximum file size is **500 MB**.`),
+        await parseInline(`😨 File is too large. The maximum file size is **300 MB**.`),
         { parse_mode: 'HTML' }
       );
       return;
     }
 
-    if ('document' in ctx.message) {
-      await handleDocument(ctx, message_id);
-      return;
-    }
+    // Go async - We want to block processing the next message
+    (async () => {
+      if ('document' in ctx.message) {
+        await handleDocument(ctx, message_id);
+        return;
+      }
 
-    if ('sticker' in ctx.message) {
-      await handleSticker(ctx, message_id);
-      return;
-    }
+      if ('sticker' in ctx.message) {
+        await handleSticker(ctx, message_id);
+        return;
+      }
 
-    // Not supported yet
-    await sendNotSupported(ctx, message_id);
+      // Not supported yet
+      await sendNotSupported(ctx, message_id);
+    })().catch(sendError);
   }
 );
 
