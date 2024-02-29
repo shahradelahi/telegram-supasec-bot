@@ -1,5 +1,8 @@
 import { env } from '@/env';
 import { logger } from '@/logger';
+import { SafeReturn } from '@/typings';
+import lodash from 'lodash';
+import prettyBytes from 'pretty-bytes';
 import { z } from 'zod';
 import { fetch } from 'zod-request';
 
@@ -9,6 +12,8 @@ const ErrorSchema = z.object({
     message: z.string()
   })
 });
+
+export type ErrorResponse = z.infer<typeof ErrorSchema>['error'];
 
 const FileReportSchema = z.object({
   data: z.object({
@@ -72,7 +77,17 @@ const FileReportSchema = z.object({
   })
 });
 
-export type FileReport = z.infer<typeof FileReportSchema>;
+export type FileReport = z.infer<typeof FileReportSchema>['data'];
+
+function f<T, E, OBJ extends object = Record<any, any>>(obj: Partial<OBJ>): SafeReturn<T, E> {
+  if (['data', 'error'].find((key) => key in obj)) {
+    return lodash.pick(obj, ['data', 'error']) as unknown as SafeReturn<T, E>;
+  }
+
+  return {
+    error: new Error('No data or its malformed. Got: ' + JSON.stringify(obj))
+  } as SafeReturn<T, E>;
+}
 
 export async function getFileReport(hash: string) {
   const url = new URL(`/api/v3/files/${hash}`, env.VT_API_BASE_URL);
@@ -98,8 +113,18 @@ export async function getFileReport(hash: string) {
   logger.debug('GET %s %s', url, response.status);
 
   const data = await response.json();
-  return data;
+  return f<FileReport, ErrorResponse>(data);
 }
+
+const UploadFileSchema = z.object({
+  data: z.object({
+    type: z.string(),
+    id: z.string(),
+    links: z.object({ self: z.string() })
+  })
+});
+
+export type UploadFile = z.infer<typeof UploadFileSchema>['data'];
 
 /**
  * Upload a file to VirusTotal. The file must be less than 32MB
@@ -118,28 +143,49 @@ export async function getFileReport(hash: string) {
  * @param password
  */
 export async function uploadFile(
-  filename: string,
+  filename: string | undefined,
   content: string | ArrayBuffer,
   password?: string
 ) {
-  const body = new FormData();
-  const blob = new Blob([content]);
-  body.set('file', blob, filename);
-  if (password) body.set('password', password);
+  const fromData = new FormData();
+
+  const buffer =
+    content instanceof ArrayBuffer ? Buffer.from(content) : Buffer.from(content.toString());
+  const blob = new Blob([buffer], { type: 'application/octet-stream' });
+  fromData.set('file', blob, filename);
+
+  if (filename && filename.endsWith('.zip') && !password) {
+    logger.warn('Zip file detected, but no password provided. This may cause false positives');
+  }
+
+  if (password) {
+    logger.debug('Password provided, adding it to the request');
+    fromData.set('password', password);
+  }
 
   let url = new URL('/api/v3/files', env.VT_API_BASE_URL).toString();
 
-  // if the file is larger than 32MB, get a special URL to upload the file
-  if (blob.size > 32 * 1024 * 1024) {
-    const res = await getUploadURL();
-    if (!('data' in res)) {
+  if (isNaN(buffer.byteLength)) {
+    throw new Error('Buffer is not a valid ArrayBuffer');
+  }
+
+  // If the file is larger than 30MB, get a special URL to upload the file
+  if (buffer.byteLength > 30 * 1024 * 1024) {
+    logger.debug('File is larger than 30MB, getting a special URL to upload the file');
+    const res = await getSpecialUploadURL();
+    if (!res.data) {
       logger.error(res);
       throw new Error('Failed to get the special URL to upload the file');
     }
+
     url = res.data
-      // replace the base URL with the special URL
+      // Replace our baseUrl with the VirusTotal provided URL
       .replace('https://www.virustotal.com/api/', env.VT_API_BASE_URL);
+  } else {
+    logger.debug('File size is %d', buffer.byteLength);
   }
+
+  logger.debug('POST %s', url);
 
   const response = await fetch(url, {
     method: 'POST',
@@ -147,7 +193,7 @@ export async function uploadFile(
       'X-Apikey': env.VT_API_KEY,
       Accept: 'application/json'
     },
-    body,
+    body: fromData,
     schema: {
       headers: z.object({
         'X-Apikey': z.string(),
@@ -157,20 +203,20 @@ export async function uploadFile(
         // error
         ErrorSchema,
         // success
-        z.object({
-          data: z.object({
-            type: z.string(),
-            id: z.string(),
-            links: z.object({ self: z.string() })
-          })
-        })
+        UploadFileSchema
       ])
     }
   });
 
   const data = await response.json();
-  return data;
+  return f<UploadFile, ErrorResponse>(data);
 }
+
+const SpecialUploadURLSchema = z.object({
+  data: z.string().url()
+});
+
+export type SpecialUploadURL = z.infer<typeof SpecialUploadURLSchema>['data'];
 
 /**
  * Get a special URL to upload a large file to VirusTotal
@@ -181,7 +227,7 @@ export async function uploadFile(
  *   --header 'x-apikey: <your API key>'
  *  ```
  */
-export async function getUploadURL() {
+export async function getSpecialUploadURL() {
   const response = await fetch(new URL('/api/v3/files/upload_url', env.VT_API_BASE_URL), {
     headers: {
       'X-Apikey': env.VT_API_KEY,
@@ -196,22 +242,20 @@ export async function getUploadURL() {
         // error
         ErrorSchema,
         // success
-        z.object({
-          data: z.string().url()
-        })
+        SpecialUploadURLSchema
       ])
     }
   });
 
   const data = await response.json();
-  return data;
+  return f<SpecialUploadURL, ErrorResponse>(data);
 }
 
 const AnalysisSchema = z.object({
   data: z.object({
     id: z.string(),
     type: z.string(),
-    links: z.object({ self: z.string(), item: z.string() }),
+    links: z.object({ self: z.string(), item: z.string().optional() }),
     attributes: z.object({
       stats: z.object({
         malicious: z.number(),
@@ -248,7 +292,7 @@ const AnalysisSchema = z.object({
   })
 });
 
-export type Analysis = z.infer<typeof AnalysisSchema>;
+export type Analysis = z.infer<typeof AnalysisSchema>['data'];
 
 /**
  * Get a URL / file analysis
@@ -280,8 +324,18 @@ export async function getAnalysisURL(id: string) {
   });
 
   const data = await response.json();
-  return data;
+  return f<Analysis, ErrorResponse>(data);
 }
+
+const RescanFileSchema = z.object({
+  data: z.object({
+    id: z.string(),
+    type: z.string(),
+    links: z.object({ self: z.string() })
+  })
+});
+
+export type RescanFile = z.infer<typeof RescanFileSchema>['data'];
 
 export async function rescanFile(id: string) {
   const response = await fetch(new URL(`/api/v3/files/${id}/analyse`, env.VT_API_BASE_URL), {
@@ -299,17 +353,11 @@ export async function rescanFile(id: string) {
         // error
         ErrorSchema,
         // success
-        z.object({
-          data: z.object({
-            id: z.string(),
-            type: z.string(),
-            links: z.object({ self: z.string() })
-          })
-        })
+        RescanFileSchema
       ])
     }
   });
 
   const data = await response.json();
-  return data;
+  return f<RescanFile, ErrorResponse>(data);
 }

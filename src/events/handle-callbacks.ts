@@ -137,17 +137,20 @@ Callbacks.on('signature', async (ctx, ...args) => {
 
   const message = Object.values(report.result.attributes.last_analysis_results)
     .filter(({ result }) => typeof result === 'string' && result !== '')
-    .map(
-      ({ engine_name, result }) => `⛔️ **${engine_name}**
-  ╰ _\`${result}_\``
-    )
-    .join('\n');
+    .map(({ engine_name, category, result }) => {
+      const emoji = category === 'malicious' ? '⛔️' : '⚠️';
+      return `${emoji}️ **${engine_name}**
+  ╰ \`${result}\``;
+    })
+    .join('\n\n');
 
   return ctx.editMessageText(
     await parseInline(`\
 🧬 **Detections**: **${report.result.attributes.last_analysis_stats.malicious}** / **${report.result.attributes.last_analysis_stats.malicious + report.result.attributes.last_analysis_stats.undetected}**
 
+
 ${message}
+
 
 [⚜️ Link to VirusTotal](https://www.virustotal.com/gui/file/${report.result.attributes.md5})`),
     {

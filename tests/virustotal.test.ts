@@ -1,23 +1,34 @@
-import { getFileReport, getUploadURL, uploadFile } from '@/lib/virustotal';
+import { getFileReport, getSpecialUploadURL, uploadFile } from '@/lib/virustotal';
 import { fsAccess } from '@/utils/fs-access';
+import { wait } from '@/utils/wait';
 import { expect } from 'chai';
 import { promises } from 'node:fs';
 import { resolve } from 'node:path';
 
 describe('VirusTotal - Reports', () => {
-  const SCANNED_SHA256 = '12b59dbcbb4ae93ec1f08b0ffa5904c14bb4ab5e2d58c36befe6fa6906114f92';
+  const SHA256_LIST = [
+    '12b59dbcbb4ae93ec1f08b0ffa5904c14bb4ab5e2d58c36befe6fa6906114f92',
+    '292d637e8b52d1695cb9366698ed16080b42de8f5aae2fe053fbeb24dd9a0604'
+  ];
 
   it('should for an already scanned file, return the report from the database', async () => {
-    const report = await getFileReport(SCANNED_SHA256);
-    expect(report).to.be.an('object');
-    expect(report).to.have.property('data');
-    if ('data' in report) {
-      expect(report.data).to.have.property('id');
-      expect(report.data).to.have.property('type');
-      expect(report.data).to.have.property('links');
-      expect(report.data).to.have.property('attributes');
-      expect(report.data.attributes).to.have.property('last_analysis_stats');
-      expect(report.data.attributes).to.have.property('last_analysis_results');
+    for (const hash of SHA256_LIST) {
+      const { data, error } = await getFileReport(hash);
+
+      expect(error, JSON.stringify(error)).to.be.undefined;
+      expect(data).to.be.an('object');
+
+      if (data) {
+        expect(data).to.have.property('id');
+        expect(data).to.have.property('type');
+        expect(data).to.have.property('links');
+        expect(data).to.have.property('attributes');
+
+        expect(data.attributes).to.have.property('last_analysis_stats');
+        expect(data.attributes).to.have.property('last_analysis_results');
+      }
+
+      await wait(1000);
     }
   });
 
@@ -25,7 +36,7 @@ describe('VirusTotal - Reports', () => {
     const report = await getFileReport('this-is-a-fake-hash');
     expect(report).to.be.an('object');
     expect(report).to.have.property('error');
-    if ('error' in report) {
+    if (report.error) {
       expect(report.error).to.have.property('code');
       expect(report.error).to.have.property('message');
       expect(report.error.code).to.equal('NotFoundError');
@@ -43,18 +54,18 @@ describe('VirusTotal - Upload', () => {
 
     const res = await uploadFile('package.json', data);
 
-    expect(res).to.have.property('data');
-    if ('data' in res) {
+    expect(res, JSON.stringify(res)).to.have.property('data');
+    if (res.data) {
       expect(res.data).to.have.property('type');
       expect(res.data).to.have.property('id');
     }
   });
 
   it('should get the special URL for uploading', async () => {
-    const res = await getUploadURL();
+    const res = await getSpecialUploadURL();
     expect(res).to.be.a('object');
     expect(res).to.have.property('data');
-    if ('data' in res) {
+    if (res.data) {
       expect(res.data).to.be.a('string');
     }
   });

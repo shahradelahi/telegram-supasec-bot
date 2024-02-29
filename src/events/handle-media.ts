@@ -1,11 +1,14 @@
 import { editResultMessage } from '@/helpers/edit-result-message';
 import { getTelegramFileUrl } from '@/helpers/get-telegram-file-url';
 import { scanRemoteFile } from '@/helpers/scan-remote-file';
-import { Scanner } from '@/lib/scanner';
+import { prisma } from '@/lib/prisma';
+import { getReport, Scanner } from '@/lib/scanner';
+import { rescanFile } from '@/lib/virustotal';
 import { logger } from '@/logger';
 import { parseInline } from '@/utils/markdown';
 import { sum } from '@/utils/number';
 import { sendError } from '@/utils/send-error';
+import { DateTime } from 'luxon';
 import type { Context } from 'telegraf';
 import type { Message, Update } from 'telegraf/types';
 
@@ -60,7 +63,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate>, message
 
   const { document } = ctx.message;
 
-  const scanner = new Scanner(document.file_unique_id, document.file_id);
+  const scanner = new Scanner(document.file_unique_id, document.file_id, document.file_name);
 
   scanner.on('database', async () => {
     await ctx.telegram.editMessageText(
@@ -135,7 +138,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate>, message
 🚀 File initialized.
 
     ✅ _File downloaded._
-    ?? _Uploading a file to VirusTotal..._`),
+    🛡 Uploading a file to VirusTotal...`),
         {
           parse_mode: 'HTML'
         }
@@ -159,8 +162,14 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate>, message
     }
   });
 
-  scanner.on('analyze', async ({ sha256, stats, status }) => {
-    if (status === 'queued') {
+  scanner.on('analyze', async ({ startTime, sha256, stats, status }) => {
+    if (status === 'in-progress' || status === 'queued') {
+      // Count of finished engines
+      const results = sum(...Object.values(stats));
+
+      // Calc seconds passed
+      const elapsed = DateTime.now().diff(DateTime.fromMillis(startTime), 'seconds').seconds;
+
       return await ctx.telegram.editMessageText(
         ctx.chat.id,
         messageId,
@@ -170,18 +179,16 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate>, message
 
   ✅ _File downloaded._
   ✅ _File uploaded to VirusTotal._
-  🔮 _Queued for analysis..._
+  ${results !== 0 ? `🔮 _File analysing: ${results}..._` : `🔮 _Queued for analysis: ${elapsed}..._`}
 
 [⚜️ Link to VirusTotal](https://www.virustotal.com/gui/file/${sha256})`),
         {
-          parse_mode: 'HTML',
-          disable_web_page_preview: true
+          parse_mode: 'HTML'
         }
       );
     }
 
-    if (status === 'in-progress') {
-      const totalFinished = sum(...Object.values(stats));
+    if (status === 'completed') {
       return await ctx.telegram.editMessageText(
         ctx.chat.id,
         messageId,
@@ -191,7 +198,7 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate>, message
 
   ✅ _File downloaded._
   ✅ _File uploaded to VirusTotal._
-  🔮 _File analysing: ${totalFinished}..._
+  ✅ _File analysed._
 
 [⚜️ Link to VirusTotal](https://www.virustotal.com/gui/file/${sha256})`),
         {
@@ -203,9 +210,82 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate>, message
 
   scanner.on('complete', async ({ result }) => {
     await editResultMessage(ctx, messageId, document.file_name, result);
+
+    const { last_analysis_date, sha256 } = result.attributes;
+
+    await checkLastAnalysisDate(sha256, last_analysis_date);
+  });
+
+  scanner.on('error', async (error) => {
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      messageId,
+      undefined,
+      // a sad face and the error message
+      `☹️ ${error.message}`
+    );
   });
 
   await scanner.scan().catch(sendError);
+}
+
+async function checkLastAnalysisDate(sha256: string, lastAnalysisDate: number | undefined) {
+  // This means, this is the first time the file is being scanned
+  if (!lastAnalysisDate) {
+    return;
+  }
+
+  function pfs(value: number) {
+    return Number((value < 0 ? value * -1 : value).toFixed(0));
+  }
+
+  // Log the last analysis date
+  const d = DateTime.fromSeconds(lastAnalysisDate).diffNow(['days', 'hours', 'minute']).toObject();
+  const diffString = `${pfs(d.days || 0)} day, ${pfs(d.hours || 0)} hr, ${pfs(d.minutes || 0)} min`;
+  logger.debug(
+    `Last analysis date: ${DateTime.fromSeconds(lastAnalysisDate).toISODate()}. It was ${diffString} ago.`
+  );
+
+  // If report last analysis was older than 60 days, request a new analysis
+  if (DateTime.fromSeconds(lastAnalysisDate).diffNow('days').days < -60) {
+    const { data, error } = await rescanFile(sha256);
+    if (error) {
+      logger.error(error);
+      return;
+    }
+
+    logger.debug(`file ${sha256} submitted for rescanning.`);
+
+    // Update analysis_id in the database
+    await prisma.file.update({
+      where: { sha256 },
+      data: {
+        analysis_id: data.id,
+        has_scan_result: false
+      }
+    });
+
+    // Create a timeout for 1 minute for requesting for new analysis
+    setTimeout(async () => {
+      const file = await prisma.file.findFirst({
+        where: { sha256 }
+      });
+
+      if (!file) {
+        logger.debug(
+          `File not found in the database. Cannot request for new analysis. sha256: ${sha256}`
+        );
+        return;
+      }
+
+      const result = await getReport(file.id, sha256);
+      if (!result.data) {
+        return;
+      }
+
+      logger.debug(`The file has been rescanned.`);
+    }, 60 * 1000);
+  }
 }
 
 export async function handleSticker(ctx: Context<Update.MessageUpdate>, messageId: number) {

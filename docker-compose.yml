@@ -2,13 +2,18 @@ version: '3'
 services:
   supasec-bot:
     container_name: 'supasec-bot'
+    image: 'shahradel/supasec:dev'
+    build:
+      context: .
+      dockerfile: Dockerfile
     deploy:
       restart_policy:
         condition: on-failure
         delay: 5s
-    image: 'node:alpine'
-    volumes:
-      - ./:/app
-    working_dir: /app
     env_file: .env.production.local
-    command: sh -c "npm install && npm run dev"
+    networks:
+        - docker_shared_network
+
+networks:
+  docker_shared_network:
+    external: true

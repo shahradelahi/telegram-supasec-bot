@@ -89,7 +89,7 @@ export async function scanRemoteFile(
   );
 
   const report = await getFileReport(sha256);
-  if ('data' in report) {
+  if (report.data) {
     await editResultMessage(ctx, messageID, file.filename, report.data);
     return;
   }

@@ -9,7 +9,7 @@ export async function editResultMessage(
   ctx: Context<Update.MessageUpdate> | Context<Update.CallbackQueryUpdate>,
   messageID: number | undefined,
   filename: string | undefined,
-  data: FileReport['data']
+  data: FileReport
 ) {
   const hasName = filename || data.attributes.meaningful_name || data.attributes.names.length > 0;
 
