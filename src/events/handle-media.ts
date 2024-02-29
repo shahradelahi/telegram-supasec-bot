@@ -217,12 +217,14 @@ export async function handleDocument(ctx: Context<Update.MessageUpdate>, message
   });
 
   scanner.on('error', async (error) => {
+    const emojiList = ['😓', '😢', '☹️'];
+    const idx = Math.floor(Math.random() * emojiList.length);
     await ctx.telegram.editMessageText(
       ctx.chat.id,
       messageId,
       undefined,
       // a sad face and the error message
-      `☹️ ${error.message}`
+      `${emojiList[idx]} ${error.message}`
     );
   });
 

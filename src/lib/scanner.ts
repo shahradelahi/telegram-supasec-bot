@@ -4,12 +4,13 @@ import {
   Analysis,
   ErrorResponse,
   FileReport,
-  getAnalysisURL,
+  getAnalysis,
   getFileReport,
   uploadFile
 } from '@/lib/virustotal';
 import { logger } from '@/logger';
 import type { DbFile, DbScanResult, SafeReturn } from '@/typings';
+import { randomInt } from '@/utils/number';
 import { wait } from '@/utils/wait';
 import { hash } from '@litehex/node-checksum';
 import lodash from 'lodash';
@@ -36,19 +37,24 @@ export class Scanner {
 
     // Get the scan result from the database
     if (file) {
-      logger.debug(`The file has a scan result.`);
+      logger.debug(`The file details were found in the database.`);
 
       const scan = (await prisma.scanResult.findFirst({ where: { file_id: file.id } })) as
         | ScannerResult
         | undefined;
 
-      if (
-        scan &&
-        scan.result &&
-        scan.result.attributes &&
-        scan.result.attributes.last_analysis_date
-      ) {
-        return this.sendEvent(SCANNER_EVENT.COMPLETE, scan as ScannerResult);
+      if (scan && scan.result && scan.result.attributes) {
+        if (scan.result.attributes.last_analysis_date) {
+          logger.debug(`File already has a scan result. Sending it to the user.`);
+          return this.sendEvent(SCANNER_EVENT.COMPLETE, scan as ScannerResult);
+        }
+
+        // If there was not a last analysis date, and we had a analysis id, we need to request the analysis
+        if (!scan.result.attributes.last_analysis_date && file.analysis_id) {
+          // Send it to analysis stage
+          logger.debug(`The file has an analysis id. Sending it to the analysis stage.`);
+          await this._stageAnalyze(file.id, file.sha256, file.analysis_id);
+        }
       }
     }
 
@@ -56,6 +62,7 @@ export class Scanner {
       logger.debug(`Requesting the file report from VirusTotal.`);
       const { data, error } = await getReport(file.id, file.sha256);
       if (data) {
+        logger.debug(`File report was found in VirusTotal. Sending report to the user.`);
         return this.sendEvent(SCANNER_EVENT.COMPLETE, data);
       }
 
@@ -135,37 +142,8 @@ export class Scanner {
 
     // Wait for the file to be analyzed
     logger.debug(`Waiting for the file to be analyzed.`);
-    const { error: analyzeError } = await this.analyze(
-      downloadedFile.id,
-      downloadedFile.sha256,
-      analysisId
-    );
-    if (analyzeError) {
-      logger.error(error);
-      return this.sendEvent(
-        SCANNER_EVENT.error,
-        new Error('An error occurred while getting the file report.')
-      );
-    }
 
-    // Wait 2 second as a Cool down
-    await wait(2000);
-
-    // Get the file report from the database
-    const { data: final, error: finalError } = await getReport(
-      downloadedFile.id,
-      downloadedFile.sha256
-    );
-    if (finalError) {
-      logger.error(finalError);
-      return this.sendEvent(
-        SCANNER_EVENT.error,
-        new Error('Sorry, something went wrong. Try to resend the file.')
-      );
-    }
-
-    // Send the final report
-    this.sendEvent(SCANNER_EVENT.COMPLETE, final);
+    await this._stageAnalyze(downloadedFile.id, downloadedFile.sha256, analysisId);
   }
 
   private async getFile(): Promise<DbFile | null> {
@@ -278,21 +256,90 @@ export class Scanner {
     }
   }
 
+  private async _stageAnalyze(fileId: string, sha256: string, analysisId: string) {
+    logger.debug('Analyzing the file. Analysis ID: %s', analysisId);
+    const { error: analyzeError } = await this.analyze(sha256, analysisId);
+    if (analyzeError) {
+      logger.error(analyzeError);
+      return this.sendEvent(
+        SCANNER_EVENT.error,
+        new Error('Sorry, something went wrong while analyzing the file.')
+      );
+    }
+
+    // Wait 2 second as a Cool down
+    await wait(2000);
+
+    // Get the file report from the database
+    const { data: final, error: finalError } = await getReport(fileId, sha256);
+    if (finalError) {
+      logger.error(finalError);
+      return this.sendEvent(
+        SCANNER_EVENT.error,
+        new Error('Sorry, something went wrong. Try to resend the file.')
+      );
+    }
+
+    // Send the final report
+    this.sendEvent(SCANNER_EVENT.COMPLETE, final);
+  }
+
   private async analyze(
-    fileId: string,
     sha256: string,
     analysisId: string
   ): Promise<SafeReturn<Analysis, ErrorResponse>> {
+    let facedError = 0;
     const startTime = Date.now();
-    const timeout = Date.now() + 50 * 1000; // 50 seconds
+    const timeout = Date.now() + 120 * 1000; // 120 seconds
+
+    // Test: wait 5-10 seconds before starting the analysis and also send a getReport request because
+    // VirusTotal might prioritize process
+    await wait(randomInt(5, 10) * 1000);
+    getReport(this.fileId, sha256).finally();
+
     while (Date.now() < timeout) {
-      const { data, error } = await getAnalysisURL(analysisId);
-      if (error) {
-        return { error };
+      // The analysis usually takes more than 30 seconds, so there is no need to wait for the first check
+      // Just send pending event to keep end user updated
+      if (Date.now() - startTime < 30 * 1000) {
+        logger.debug(`Analysis status: paused (elapsed: ${Date.now() - startTime}ms)`);
+
+        this.sendEvent(SCANNER_EVENT.ANALYZE, {
+          startTime,
+          sha256,
+          stats: {
+            malicious: 0,
+            suspicious: 0,
+            undetected: 0,
+            harmless: 0,
+            timeout: 0,
+            'confirmed-timeout': 0,
+            failure: 0,
+            'type-unsupported': 0
+          },
+          status: 'queued'
+        });
+        await wait(randomInt(8, 12) * 1000);
+        continue;
       }
 
-      const elapsed = Date.now() - startTime;
-      logger.debug(`Analysis status: ${data.attributes.status} (elapsed: ${elapsed}ms)`);
+      logger.debug(`Checking the analysis status. (elapsed: ${Date.now() - startTime}ms)`);
+      const { data, error } = await getAnalysis(analysisId);
+      if (error) {
+        if (facedError > 3) {
+          logger.error('Analysis encountered an error 3 times. Stopping the analysis.');
+          return { error };
+        }
+
+        logger.warn('Analysis encountered an error but will retry. Error: %s', error.message);
+        facedError++;
+
+        await wait(20 * 1000);
+        continue;
+      }
+
+      logger.debug(
+        `Analysis status: ${data.attributes.status} (elapsed: ${Date.now() - startTime}ms)`
+      );
 
       this.sendEvent(SCANNER_EVENT.ANALYZE, {
         startTime,
@@ -305,7 +352,8 @@ export class Scanner {
         return { data };
       }
 
-      await wait(15 * 1000); // Wait 15 seconds for next check
+      // Random between 20-25 seconds wait time
+      await wait(randomInt(20, 25) * 1000);
     }
 
     // If the analysis took too long, return a timeout error

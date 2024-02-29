@@ -303,7 +303,7 @@ export type Analysis = z.infer<typeof AnalysisSchema>['data'];
  *   --header 'x-apikey: <your API key>'
  *  ```
  */
-export async function getAnalysisURL(id: string) {
+export async function getAnalysis(id: string) {
   const response = await fetch(new URL(`/api/v3/analyses/${id}`, env.VT_API_BASE_URL), {
     headers: {
       'X-Apikey': env.VT_API_KEY,

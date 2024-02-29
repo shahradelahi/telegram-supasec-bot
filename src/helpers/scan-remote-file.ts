@@ -1,5 +1,5 @@
 import { editResultMessage } from '@/helpers/edit-result-message';
-import { getAnalysisURL, getFileReport, uploadFile } from '@/lib/virustotal';
+import { getAnalysis, getFileReport, uploadFile } from '@/lib/virustotal';
 import { logger } from '@/logger';
 import { downloadFile } from '@/utils/download-file';
 import { parseInline } from '@/utils/markdown';
@@ -133,7 +133,7 @@ export async function scanRemoteFile(
     );
 
     // Create a loop to wait for the analysis to be complete
-    let analysisRes = await getAnalysisURL(uploadRes.data.id);
+    let analysisRes = await getAnalysis(uploadRes.data.id);
     while (true) {
       if ('error' in analysisRes) {
         logger.error(`An error occurred while waiting for the analysis results.`);
@@ -193,7 +193,7 @@ export async function scanRemoteFile(
       // Wait 15 seconds before checking again
       logger.debug(`Analysis not completed yet, waiting 15 seconds...`);
       await wait(15 * 1000);
-      analysisRes = await getAnalysisURL(uploadRes.data.id);
+      analysisRes = await getAnalysis(uploadRes.data.id);
     }
 
     await ctx.telegram.editMessageText(
