@@ -258,6 +258,16 @@ export class Scanner {
 
   private async _stageAnalyze(fileId: string, sha256: string, analysisId: string) {
     logger.debug('Analyzing the file. Analysis ID: %s', analysisId);
+
+    // Wait 2-4 seconds before starting the analysis and also send a getReport request because
+    // VirusTotal might prioritize process or its already processed
+    await wait(randomInt(2, 4) * 1000);
+    const { data: report } = await getReport(fileId, sha256);
+    if (report && report.result.attributes.last_analysis_date) {
+      logger.debug(`The file has been analyzed.`);
+      return this.sendEvent(SCANNER_EVENT.COMPLETE, report);
+    }
+
     const { error: analyzeError } = await this.analyze(sha256, analysisId);
     if (analyzeError) {
       logger.error(analyzeError);
@@ -267,8 +277,8 @@ export class Scanner {
       );
     }
 
-    // Wait 2 second as a Cool down
-    await wait(2000);
+    // Wait 2-3 second as a Cool down
+    await wait(randomInt(2, 3) * 1000);
 
     // Get the file report from the database
     const { data: final, error: finalError } = await getReport(fileId, sha256);
@@ -291,12 +301,6 @@ export class Scanner {
     let facedError = 0;
     const startTime = Date.now();
     const timeout = Date.now() + 120 * 1000; // 120 seconds
-
-    // Test: wait 5-10 seconds before starting the analysis and also send a getReport request because
-    // VirusTotal might prioritize process
-    await wait(randomInt(5, 10) * 1000);
-    getReport(this.fileId, sha256).finally();
-
     while (Date.now() < timeout) {
       // The analysis usually takes more than 30 seconds, so there is no need to wait for the first check
       // Just send pending event to keep end user updated
