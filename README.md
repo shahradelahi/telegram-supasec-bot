@@ -1,5 +1,5 @@
-<div style="text-align: center;">
-  <img src="https://raw.githubusercontent.com/shahradelahi/telegram-supasec-bot/master/animated-logo.gif" alt="Supasec Bot" />
+<div style="text-align: center; margin-bottom: 20px;">
+  <img src="https://github.com/shahradelahi/telegram-supasec-bot/blob/master/animated-logo.gif" alt="Supasec Bot" width="180" />
 </div>
 
 # Supasec Bot
@@ -8,7 +8,7 @@
 
 This is a virus scanner bot for the Telegram. It uses the [VirusTotal API](https://www.virustotal.com/en/documentation/public-api/) to scan files for viruses.
 
-## Build
+## ⚙️ Build
 
 This project uses Docker to build and start the app. Follow the instructions below to build the app and start it locally.
 
@@ -23,7 +23,7 @@ This project uses Docker to build and start the app. Follow the instructions bel
 $ make build
 ```
 
-## Start
+## 🚀 Start
 
 ### Database
 
@@ -38,14 +38,14 @@ docker run -d \
   postgres:alpine
 ```
 
-### Start
+### Bot
 
 ```bash
 docker run -d \
   --name supasec-bot \
   -e TG_TOKEN=your-telegram-bot-token \
   -e VT_API_KEY=your-virustotal-api-key \
-  -e DATABASE_URL=postgres://postgres:super-secret-password@localhost:5432/supasec?schema=private \
+  -e DATABASE_URL="postgres://postgres:super-secret-password@localhost:5432/supasec?schema=private" \
   shahradel/supasec:dev
 ```
 
