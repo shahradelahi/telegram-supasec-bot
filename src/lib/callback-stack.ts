@@ -1,9 +1,9 @@
 import { logger } from '@/logger';
 import { Context } from 'telegraf';
-import { Update } from 'telegraf/types';
+import { CallbackQuery, Update } from 'telegraf/types';
 
 export type CallbackStackFn = (
-  ctx: Context<Update.CallbackQueryUpdate>,
+  ctx: Context<Update.CallbackQueryUpdate<CallbackQuery.DataQuery>>,
   ...args: string[]
 ) => Promise<any>;
 
@@ -14,11 +14,18 @@ export class CallbackStack {
     this._actions = new Map();
   }
 
-  on(action: string, callback: CallbackStackFn) {
-    this._actions.set(action, callback);
+  on(action: string | string[], callback: CallbackStackFn) {
+    action = Array.isArray(action) ? action : [action];
+    for (const a of action) {
+      this._actions.set(a, callback);
+    }
   }
 
-  async send(ctx: Context<Update.CallbackQueryUpdate>, action: string, ...args: string[]) {
+  async send(
+    ctx: Context<Update.CallbackQueryUpdate<CallbackQuery.DataQuery>>,
+    action: string,
+    ...args: string[]
+  ) {
     const callback = this._actions.get(action);
     if (!callback) {
       logger.debug(`Unknown action: ${action}`);

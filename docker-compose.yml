@@ -12,7 +12,7 @@ services:
         delay: 5s
     env_file: .env.production.local
     networks:
-        - docker_shared_network
+      - docker_shared_network
 
 networks:
   docker_shared_network:

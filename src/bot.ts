@@ -23,6 +23,13 @@ const bot: Telegraf<Context> = new Telegraf(env.TG_TOKEN, {
   handlerTimeout: 120_000 // 2 minutes
 });
 
+// Set commands
+bot.telegram.setMyCommands([
+  { command: 'start', description: 'Start the bot' },
+  { command: 'help', description: 'Get help' },
+  { command: 'profile', description: 'Get your profile' }
+]);
+
 // Add the user to the database if they are not already there
 bot.use(async (ctx, next) => {
   // user must be present in the context and chat must be private

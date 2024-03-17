@@ -21,6 +21,7 @@
     "lodash": "^4.17.21",
     "luxon": "^3.4.4",
     "marked": "^12.0.0",
+    "p-safe": "^0.1.0",
     "prettier": "^3.2.5",
     "pretty-bytes": "^6.1.1",
     "telegraf": "^4.15.3",

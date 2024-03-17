@@ -11,11 +11,11 @@ export function sendError(error: any) {
   console.log();
 
   (async () => {
-    if (typeof bot === 'undefined' || typeof env.ADMIN_CHAT_ID === 'undefined') {
+    if (typeof bot === 'undefined' || typeof env.TG_ADMIN_ID === 'undefined') {
       return;
     }
 
-    const chatId = env.ADMIN_CHAT_ID;
+    const chatId = env.TG_ADMIN_ID;
     const fileName = `error-${Date.now()}.log`;
     await bot.telegram.sendDocument(chatId, {
       source: Buffer.from(error.stack ?? error.message ?? error),

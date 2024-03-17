@@ -29,6 +29,9 @@ dependencies:
   marked:
     specifier: ^12.0.0
     version: 12.0.0
+  p-safe:
+    specifier: ^0.1.0
+    version: 0.1.0
   prettier:
     specifier: ^3.2.5
     version: 3.2.5
@@ -1411,6 +1414,10 @@ packages:
     dependencies:
       p-limit: 3.1.0
     dev: true
+
+  /p-safe@0.1.0:
+    resolution: {integrity: sha512-A3YWGGaKK++7P6zYbT6UeQOKrsmUVv8ypLTsKOPdBTEK7T7+yzJSjeiwreVPa9eH1XfRu+dvacvde5w7UslNcw==}
+    dev: false
 
   /p-timeout@4.1.0:
     resolution: {integrity: sha512-+/wmHtzJuWii1sXn3HCuH/FTwGhrp4tmJTxSKJbfS+vkipci6osxXM5mY0jUiRzWKMTgUT8l7HFbeSwZAynqHw==}
