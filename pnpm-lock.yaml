@@ -28,7 +28,7 @@ dependencies:
     version: 3.4.4
   marked:
     specifier: ^12.0.0
-    version: 12.0.0
+    version: 12.0.1
   p-safe:
     specifier: ^0.1.0
     version: 0.1.0
@@ -1256,8 +1256,8 @@ packages:
     engines: {node: '>=12'}
     dev: false
 
-  /marked@12.0.0:
-    resolution: {integrity: sha512-Vkwtq9rLqXryZnWaQc86+FHLC6tr/fycMfYAhiOIXkrNmeGAyhSxjqu0Rs1i0bBqw5u0S7+lV9fdH2ZSVaoa0w==}
+  /marked@12.0.1:
+    resolution: {integrity: sha512-Y1/V2yafOcOdWQCX0XpAKXzDakPOpn6U0YLxTJs3cww6VxOzZV1BTOOYWLvH3gX38cq+iLwljHHTnMtlDfg01Q==}
     engines: {node: '>= 18'}
     hasBin: true
     dev: false
