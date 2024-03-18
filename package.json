@@ -11,7 +11,7 @@
     "db:push": "prisma db push"
   },
   "license": "GPL-3.0",
-  "packageManager": "pnpm@8.15.0",
+  "packageManager": "pnpm@8.15.5",
   "dependencies": {
     "@litehex/node-checksum": "^0.1.2",
     "@prisma/client": "5.11.0",
