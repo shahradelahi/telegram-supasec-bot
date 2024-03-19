@@ -57,7 +57,7 @@ dependencies:
 devDependencies:
   '@types/chai':
     specifier: ^4.3.12
-    version: 4.3.12
+    version: 4.3.13
   '@types/lodash':
     specifier: ^4.17.0
     version: 4.17.0
@@ -546,8 +546,8 @@ packages:
     resolution: {integrity: sha512-kGevOIbpMcIlCDeorKGpwZmdH7kHbqlk/Yj6dEpJMKEQw5lk0KVQY0OLXaCswy8GqlIVLd5625OB+rAntP9xVw==}
     dev: false
 
-  /@types/chai@4.3.12:
-    resolution: {integrity: sha512-zNKDHG/1yxm8Il6uCCVsm+dRdEsJlFoDu73X17y09bId6UwoYww+vFBsAcRzl8knM1sab3Dp1VRikFQwDOtDDw==}
+  /@types/chai@4.3.13:
+    resolution: {integrity: sha512-+LxQEbg4BDUf88utmhpUpTyYn1zHao443aGnXIAQak9ZMt9Rtsic0Oig0OS1xyIqdDXc5uMekoC6NaiUlkT/qA==}
     dev: true
 
   /@types/estree@1.0.5:
