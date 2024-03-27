@@ -51,8 +51,8 @@ dependencies:
     specifier: ^3.22.4
     version: 3.22.4
   zod-request:
-    specifier: 0.1.1
-    version: 0.1.1
+    specifier: 0.2.1
+    version: 0.2.1
 
 devDependencies:
   '@types/chai':
@@ -1341,6 +1341,11 @@ packages:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
     dev: true
 
+  /mustache@4.2.0:
+    resolution: {integrity: sha512-71ippSywq5Yb7/tVYyGbkBggbU8H3u5Rz56fH60jGFgr8uHwxs+aSKeqmluIVzM0m0kB7xQjKS6qPfd0b2ZoqQ==}
+    hasBin: true
+    dev: false
+
   /mz@2.7.0:
     resolution: {integrity: sha512-z81GNO7nnYMEhrGh9LeymoE4+Yr0Wn5McHIZMK5cfQCl+NDX08sCZgUc9/6MHni9IWuFLm1Z3HTCXu2z9fN62Q==}
     dependencies:
@@ -1917,10 +1922,6 @@ packages:
     resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
     dev: true
 
-  /undici-types@6.6.2:
-    resolution: {integrity: sha512-acoBcoBobgsg3YUEO/Oht8JJCuFYpzWLFKbqEbcEZcXdkQrTzkF/yWj9JoLaFDa6ArI31dFEmNZkCjQZ7mlf7w==}
-    dev: false
-
   /undici@6.9.0:
     resolution: {integrity: sha512-XPWfXzJedevUziHwun70EKNvGnxv4CnfraFZ4f/JV01+fcvMYzHE26r/j8AY/9c/70nkN4B1zX7E2Oyuqwz4+Q==}
     engines: {node: '>=18.0'}
@@ -2031,10 +2032,11 @@ packages:
     engines: {node: '>=10'}
     dev: true
 
-  /zod-request@0.1.1:
-    resolution: {integrity: sha512-7ibmwVdYnREEW6TyQ0itFzdLJY5peFndKh04c58HgEUKJgPD4x9DUg5wUoBxPrTRnygmKdw+t3IOl0+VevptxQ==}
+  /zod-request@0.2.1:
+    resolution: {integrity: sha512-mrKpaw7nxY3IfhcjCdlOzRDXjjrg4UvvxDVtmj4YWUuH7TNLfOFR28l1FipCAb0gmt0zHqJPJaWGQq6X8RoSJw==}
+    engines: {node: '>=18.0.0'}
     dependencies:
-      undici-types: 6.6.2
+      mustache: 4.2.0
       zod: 3.22.4
     dev: false
 

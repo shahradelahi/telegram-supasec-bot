@@ -28,7 +28,7 @@
     "undici": "^6.9.0",
     "validator": "^13.11.0",
     "zod": "^3.22.4",
-    "zod-request": "0.1.1"
+    "zod-request": "0.2.1"
   },
   "devDependencies": {
     "@types/chai": "^4.3.12",
